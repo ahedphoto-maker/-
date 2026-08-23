@@ -18,6 +18,15 @@ import {
   initialBookings
 } from '../data/mockData';
 import { triggerCelebration, toEnglishDigits, sanitizeObjectToEnglishDigits } from '../utils/helpers';
+import { db } from '../firebase';
+import { 
+  collection, 
+  onSnapshot, 
+  doc, 
+  setDoc, 
+  deleteDoc, 
+  writeBatch 
+} from 'firebase/firestore';
 
 const AppContext = createContext();
 
@@ -80,7 +89,7 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  // Core App Datasets in local state
+  // Core App Datasets initialized from localStorage cache (fast startup fallback)
   const [team, setTeam] = useState(() => getStoredState('star_media_team', initialTeam));
   const [clients, setClients] = useState(() => getStoredState('star_media_clients', initialClients));
   const [companies, setCompanies] = useState(() => getStoredState('star_media_companies', initialCompanies));
@@ -115,6 +124,85 @@ export const AppProvider = ({ children }) => {
   const [isOnline, setIsOnline] = useState(() => getStoredState('star_media_isOnline', true));
   const [pendingOfflineActions, setPendingOfflineActions] = useState(() => getStoredState('star_media_pendingOfflineActions', []));
 
+  // Real-time Firestore synchronization & automatic seeding
+  useEffect(() => {
+    const collectionsToSync = [
+      { name: 'team', stateSetter: setTeam, initialData: initialTeam },
+      { name: 'clients', stateSetter: setClients, initialData: initialClients },
+      { name: 'companies', stateSetter: setCompanies, initialData: initialCompanies },
+      { name: 'freelancers', stateSetter: setFreelancers, initialData: [
+        { id: 901, name: 'أحمد السلمي', phone: '0542223333', email: 'ahmed.salmi@example.com', notes: 'مصور درون وفيديو خارجي', monthlyAccount: true, rating: { commitment: 5, quality: 4, cooperation: 5, speed: 4 } },
+        { id: 902, name: 'سعد العتيبي', phone: '0559876543', email: 'saad.otb@example.com', notes: 'مصور فوتوغرافي محترف', monthlyAccount: false, rating: { commitment: 4, quality: 5, cooperation: 4, speed: 4 } },
+        { id: 903, name: 'رائد الحارثي', phone: '0564445555', email: 'raed.harbi@example.com', notes: 'متخصص تغطيات مؤتمرات', monthlyAccount: true, rating: { commitment: 5, quality: 5, cooperation: 4, speed: 5 } }
+      ] },
+      { name: 'equipment', stateSetter: setEquipment, initialData: initialEquipment },
+      { name: 'bookings', stateSetter: setBookings, initialData: initialBookings },
+      { name: 'projects', stateSetter: setProjects, initialData: initialProjects },
+      { name: 'tasks', stateSetter: setTasks, initialData: initialTasks },
+      { name: 'invoices', stateSetter: setInvoices, initialData: initialInvoices },
+      { name: 'payments', stateSetter: setPayments, initialData: initialPayments },
+      { name: 'expenses', stateSetter: setExpenses, initialData: initialExpenses },
+      { name: 'auditLogs', stateSetter: setAuditLogs, initialData: initialAuditLogs },
+      { name: 'notifications', stateSetter: setNotifications, initialData: initialNotifications },
+      { name: 'contracts', stateSetter: setContracts, initialData: initialContracts },
+      { name: 'files', stateSetter: setFiles, initialData: initialFiles },
+      { name: 'customRoles', stateSetter: setCustomRoles, initialData: initialCustomRoles },
+      { name: 'quotations', stateSetter: setQuotations, initialData: [
+        { id: 8001, quoteNumber: 'QT-2026-001', clientName: 'شركة الإبداع للفعاليات', date: '2026-08-20', totalPrice: 5000, description: 'عرض سعر لتصوير فيديو دعائي مدته دقيقة بدقة 4K', status: 'بانتظار العميل' },
+        { id: 8002, quoteNumber: 'QT-2026-002', clientName: 'متجر بيت ستايل', date: '2026-08-22', totalPrice: 3200, description: 'عرض سعر لتغطية موقع معرض الرياض الرئيسي', status: 'مقبول' }
+      ] },
+      { name: 'waitlist', stateSetter: setWaitlist, initialData: [
+        { id: 7001, clientName: 'صالون ستايل النسائي', date: '2026-08-12', phone: '0551234567', notes: 'يرغب بالتصوير مساءً' }
+      ] }
+    ];
+
+    const unsubscribes = collectionsToSync.map(({ name, stateSetter, initialData }) => {
+      return onSnapshot(collection(db, name), (snapshot) => {
+        const docs = [];
+        snapshot.forEach(docSnap => {
+          const data = docSnap.data();
+          docs.push({ 
+            ...data, 
+            id: Number(docSnap.id) || docSnap.id 
+          });
+        });
+        
+        if (docs.length > 0) {
+          if (name === 'bookings') {
+            docs.sort((a, b) => b.id - a.id);
+          } else if (name === 'auditLogs') {
+            docs.sort((a, b) => b.id - a.id);
+          } else if (name === 'notifications') {
+            docs.sort((a, b) => b.id - a.id);
+          }
+          stateSetter(docs);
+        } else {
+          // Firestore collection is empty, seed from default initial data
+          const batch = writeBatch(db);
+          initialData.forEach(item => {
+            const docRef = doc(collection(db, name), String(item.id));
+            batch.set(docRef, item);
+          });
+          batch.commit().catch(err => console.error(`Error seeding ${name}:`, err));
+        }
+      });
+    });
+
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'defaultConfig'), (docSnap) => {
+      if (docSnap.exists()) {
+        setSettings(docSnap.data());
+      } else {
+        setDoc(doc(db, 'settings', 'defaultConfig'), defaultSettings);
+      }
+    });
+
+    return () => {
+      unsubscribes.forEach(unsub => unsub());
+      unsubSettings();
+    };
+  }, []);
+
+  // Write changes to localStorage as a redundant secondary cache
   useEffect(() => { localStorage.setItem('star_media_team', JSON.stringify(team)); }, [team]);
   useEffect(() => { localStorage.setItem('star_media_clients', JSON.stringify(clients)); }, [clients]);
   useEffect(() => { localStorage.setItem('star_media_companies', JSON.stringify(companies)); }, [companies]);
@@ -169,7 +257,7 @@ export const AppProvider = ({ children }) => {
     setActiveOverlay('BOOKING');
   };
 
-  // ─── LOCAL STATE CRUD ACTIONS ───────────────────────────────────────────
+  // ─── CLOUD FIRESTORE CRUD ACTIONS ───────────────────────────────────────────
   const addAuditLog = useCallback((action, details, icon = '📝') => {
     const newLog = {
       id: Date.now(),
@@ -180,7 +268,7 @@ export const AppProvider = ({ children }) => {
       details,
       icon
     };
-    setAuditLogs(prev => [newLog, ...prev]);
+    setDoc(doc(db, 'auditLogs', String(newLog.id)), newLog);
   }, [currentUser, userRole]);
 
   // Bookings CRUD
@@ -263,95 +351,80 @@ export const AppProvider = ({ children }) => {
       };
     });
 
-    if (!isOnline) {
-      setPendingOfflineActions(prev => [...prev, { type: 'ADD_BOOKING', data: newBookings }]);
-      setBookings(prev => [...newBookings, ...prev]);
-      showCelebration('تم حفظ الحجز محلياً (وضع أوفلاين) 🔒');
-    } else {
-      setBookings(prev => [...newBookings, ...prev]);
-      showCelebration('تم إنشاء الحجز وتزامنه بنجاح! 🎉');
-    }
-    
+    newBookings.forEach(booking => {
+      setDoc(doc(db, 'bookings', String(booking.id)), booking);
+    });
+    showCelebration('تم إنشاء الحجز وتزامنه بنجاح! 🎉');
+
     if (newBookings.length === 1) {
       addAuditLog('إنشاء حجز', `تم إنشاء حجز جديد: ${newBookings[0].title}`, '📅');
     } else {
       addAuditLog('إنشاء حجوزات متكررة', `تم إنشاء عدد ${newBookings.length} حجوزات متكررة لـ ${newBookings[0].title}`, '📅');
     }
     return newBookings[0];
-  }, [addAuditLog, isOnline, currentUser]);
+  }, [addAuditLog, currentUser]);
 
   const updateBooking = useCallback((bookingId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
+    const target = bookings.find(b => b.id === Number(bookingId));
+    if (!target) return;
 
-    if (!isOnline) {
-      setPendingOfflineActions(prev => [...prev, { type: 'UPDATE_BOOKING', bookingId, data: sanitizedFields }]);
-      showCelebration('تم حفظ التعديل محلياً (وضع أوفلاين) 🔒');
+    const changes = [];
+    if (sanitizedFields.date && sanitizedFields.date !== target.date) changes.push(`تغيير التاريخ من ${target.date} إلى ${sanitizedFields.date}`);
+    if (sanitizedFields.status && sanitizedFields.status !== target.status) changes.push(`تغيير الحالة من ${target.status} إلى ${sanitizedFields.status}`);
+    if (sanitizedFields.teamAssigned && JSON.stringify(sanitizedFields.teamAssigned) !== JSON.stringify(target.teamAssigned)) changes.push(`تعديل الفريق المكلف`);
+    
+    const newLogs = [...(target.changeLogs || [])];
+    if (changes.length > 0) {
+      newLogs.push({
+        timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        userName: currentUser?.name || 'النظام',
+        action: changes.join(' | ')
+      });
     }
 
-    setBookings(prev => prev.map(b => {
-      if (b.id === Number(bookingId)) {
-        const changes = [];
-        if (sanitizedFields.date && sanitizedFields.date !== b.date) changes.push(`تغيير التاريخ من ${b.date} إلى ${sanitizedFields.date}`);
-        if (sanitizedFields.status && sanitizedFields.status !== b.status) changes.push(`تغيير الحالة من ${b.status} إلى ${sanitizedFields.status}`);
-        if (sanitizedFields.teamAssigned && JSON.stringify(sanitizedFields.teamAssigned) !== JSON.stringify(b.teamAssigned)) changes.push(`تعديل الفريق المكلف`);
-        
-        const newLogs = [...(b.changeLogs || [])];
-        if (changes.length > 0) {
-          newLogs.push({
-            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
-            userName: currentUser?.name || 'النظام',
-            action: changes.join(' | ')
-          });
-        }
+    const merged = {
+      ...target,
+      ...sanitizedFields,
+      changeLogs: newLogs,
+      locked: sanitizedFields.status === 'مؤكد' || target.status === 'مؤكد'
+    };
 
-        const merged = {
-          ...b,
-          ...sanitizedFields,
-          changeLogs: newLogs,
-          locked: sanitizedFields.status === 'مؤكد' || b.status === 'مؤكد'
-        };
+    const price = merged.totalPrice;
+    const paid = merged.paidAmount || 0;
+    const inv = merged.invoiceNumber || merged.invoiceId;
 
-        // Recalculate remaining amount and financialStatus if prices are updated
-        const price = merged.totalPrice;
-        const paid = merged.paidAmount || 0;
-        const inv = merged.invoiceNumber || merged.invoiceId;
-
-        if (sanitizedFields.financialStatus === undefined) {
-          if (price === null || price === undefined || price === '') {
-            merged.financialStatus = 'no_price';
-          } else if (paid >= price && price > 0) {
-            merged.financialStatus = 'settled';
-          } else if (inv) {
-            merged.financialStatus = 'invoice_added';
-          } else if (paid < price) {
-            merged.financialStatus = 'due';
-          } else {
-            merged.financialStatus = 'price_set';
-          }
-        }
-
-        return merged;
+    if (sanitizedFields.financialStatus === undefined) {
+      if (price === null || price === undefined || price === '') {
+        merged.financialStatus = 'no_price';
+      } else if (paid >= price && price > 0) {
+        merged.financialStatus = 'settled';
+      } else if (inv) {
+        merged.financialStatus = 'invoice_added';
+      } else if (paid < price) {
+        merged.financialStatus = 'due';
+      } else {
+        merged.financialStatus = 'price_set';
       }
-      return b;
-    }));
+    }
+
+    setDoc(doc(db, 'bookings', String(bookingId)), merged);
     addAuditLog('تحديث حجز', `تم تعديل تفاصيل الحجز رقم ${bookingId}`, '📅');
-  }, [addAuditLog, isOnline, currentUser]);
+  }, [addAuditLog, bookings, currentUser]);
 
   const deleteBooking = useCallback((bookingId) => {
     const target = bookings.find(b => b.id === Number(bookingId));
     if (target && target.status === 'مؤكد') {
-      setBookings(prev => prev.map(b => b.id === Number(bookingId) ? { ...b, status: 'ملغي' } : b));
+      const updated = { ...target, status: 'ملغي' };
+      setDoc(doc(db, 'bookings', String(bookingId)), updated);
       addAuditLog('إلغاء حجز مؤكد', `تم إلغاء الحجز المؤكد رقم ${bookingId} بدلاً من حذفه بالكامل`, '⚠️');
       showCelebration('تم إلغاء الحجز المؤكد أمنياً 🔒');
       return;
     }
 
-    if (!isOnline) {
-      setPendingOfflineActions(prev => [...prev, { type: 'DELETE_BOOKING', bookingId }]);
-    }
-    setBookings(prev => prev.filter(b => b.id !== Number(bookingId)));
+    deleteDoc(doc(db, 'bookings', String(bookingId)));
     addAuditLog('حذف حجز', `تم إزالة الحجز رقم ${bookingId}`, '❌');
-  }, [addAuditLog, isOnline, bookings]);
+  }, [addAuditLog, bookings]);
 
   // Tasks CRUD
   const addTask = useCallback((taskData) => {
@@ -362,18 +435,22 @@ export const AppProvider = ({ children }) => {
       progress: 0,
       checklist: (sanitizedData.checklist || []).map(text => ({ text, done: false }))
     };
-    setTasks(prev => [newTask, ...prev]);
+    setDoc(doc(db, 'tasks', String(newTask.id)), newTask);
     addAuditLog('إسناد مهمة', `تم إسناد مهمة جديدة: ${newTask.title}`, '🎯');
   }, [addAuditLog]);
 
   const updateTask = useCallback((taskId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
-    setTasks(prev => prev.map(t => t.id === Number(taskId) ? { ...t, ...sanitizedFields } : t));
-    addAuditLog('تحديث مهمة', `تم تعديل تفاصيل المهمة رقم ${taskId}`, '✓');
-  }, [addAuditLog]);
+    const target = tasks.find(t => t.id === Number(taskId));
+    if (target) {
+      const merged = { ...target, ...sanitizedFields };
+      setDoc(doc(db, 'tasks', String(taskId)), merged);
+      addAuditLog('تحديث مهمة', `تم تعديل تفاصيل المهمة رقم ${taskId}`, '✓');
+    }
+  }, [addAuditLog, tasks]);
 
   const deleteTask = useCallback((taskId) => {
-    setTasks(prev => prev.filter(t => t.id !== Number(taskId)));
+    deleteDoc(doc(db, 'tasks', String(taskId)));
     addAuditLog('حذف مهمة', `تم إزالة المهمة رقم ${taskId}`, '🗑️');
   }, [addAuditLog]);
 
@@ -381,14 +458,19 @@ export const AppProvider = ({ children }) => {
     const task = tasks.find(t => t.id === Number(taskId));
     if (!task) return;
 
-    setTasks(prev => prev.map(t => t.id === Number(taskId) ? { ...t, status: 'مكتملة', progress: 100 } : t));
+    const updatedTask = { ...task, status: 'مكتملة', progress: 100 };
+    setDoc(doc(db, 'tasks', String(taskId)), updatedTask);
     
     const earnedPoints = task.points || 10;
-    setTeam(prev => prev.map(m => m.id === task.assigneeId ? { ...m, points: (m.points || 0) + earnedPoints, tasksCompleted: (m.tasksCompleted || 0) + 1 } : m));
+    const member = team.find(m => m.id === task.assigneeId);
+    if (member) {
+      const updatedMember = { ...member, points: (member.points || 0) + earnedPoints, tasksCompleted: (member.tasksCompleted || 0) + 1 };
+      setDoc(doc(db, 'team', String(member.id)), updatedMember);
+    }
 
     showCelebration(`أحسنت يا ${task.assigneeName}! تم إكمال المهمة بنجاح 🎉 (+${earnedPoints} نقطة إنجاز)`);
     addAuditLog('إكمال مهمة', `تم إنجاز المهمة: ${task.title} بواسطة ${task.assigneeName}`, '🎉');
-  }, [tasks, addAuditLog]);
+  }, [tasks, team, addAuditLog]);
 
   const addNotification = useCallback((title, message, type = 'general') => {
     const newNotif = {
@@ -399,36 +481,40 @@ export const AppProvider = ({ children }) => {
       read: false,
       type
     };
-    setNotifications(prev => [newNotif, ...prev]);
+    setDoc(doc(db, 'notifications', String(newNotif.id)), newNotif);
   }, []);
 
   const checkInLocation = useCallback((taskId, checkInType, coords = '24.7136, 46.6753') => {
-    setTasks(prev => prev.map(t => {
-      if (t.id === Number(taskId)) {
-        const now = new Date().toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' });
-        const updatedTask = { ...t };
-        if (checkInType === 'heading') {
-          updatedTask.status = 'في الطريق';
-          updatedTask.headingTime = now;
-          addAuditLog('بدء التوجه للموقع', `المصور بدأ التوجه للمهمة: ${t.title}`, '📍');
-          addNotification('بدء التوجه 📍', `${currentUser?.name} بدأ التوجه لموقع المهمة: ${t.title}`, 'task');
-        } else if (checkInType === 'arrived') {
-          updatedTask.status = 'وصلت';
-          updatedTask.arrivalTime = now;
-          updatedTask.coords = coords;
-          addAuditLog('الوصول للموقع', `وصل المصور للموقع للمهمة: ${t.title} (إحداثيات: ${coords})`, '📍');
-          addNotification('وصلت للموقع 📍', `وصل ${currentUser?.name} لموقع المهمة: ${t.title}`, 'task');
-        }
-        return updatedTask;
-      }
-      return t;
-    }));
-  }, [currentUser, addAuditLog, addNotification]);
+    const t = tasks.find(task => task.id === Number(taskId));
+    if (!t) return;
+    
+    const now = new Date().toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' });
+    const updatedTask = { ...t };
+    
+    if (checkInType === 'heading') {
+      updatedTask.status = 'في الطريق';
+      updatedTask.headingTime = now;
+      setDoc(doc(db, 'tasks', String(taskId)), updatedTask);
+      addAuditLog('بدء التوجه للموقع', `المصور بدأ التوجه للمهمة: ${t.title}`, '📍');
+      addNotification('بدء التوجه 📍', `${currentUser?.name} بدأ التوجه لموقع المهمة: ${t.title}`, 'task');
+    } else if (checkInType === 'arrived') {
+      updatedTask.status = 'وصلت';
+      updatedTask.arrivalTime = now;
+      updatedTask.coords = coords;
+      setDoc(doc(db, 'tasks', String(taskId)), updatedTask);
+      addAuditLog('الوصول للموقع', `وصل المصور للموقع للمهمة: ${t.title} (إحداثيات: ${coords})`, '📍');
+      addNotification('وصلت للموقع 📍', `وصل ${currentUser?.name} لموقع المهمة: ${t.title}`, 'task');
+    }
+  }, [currentUser, tasks, addAuditLog, addNotification]);
 
   const updateTaskStatus = useCallback((taskId, status, progress) => {
-    setTasks(prev => prev.map(t => t.id === Number(taskId) ? { ...t, status, progress } : t));
-    addAuditLog('تحديث حالة المهمة', `تم تغيير حالة المهمة #${taskId} إلى ${status}`, '✓');
-  }, [addAuditLog]);
+    const target = tasks.find(t => t.id === Number(taskId));
+    if (target) {
+      const merged = { ...target, status, progress };
+      setDoc(doc(db, 'tasks', String(taskId)), merged);
+      addAuditLog('تحديث حالة المهمة', `تم تغيير حالة المهمة #${taskId} إلى ${status}`, '✓');
+    }
+  }, [addAuditLog, tasks]);
 
   const updateUserProfile = useCallback((profileData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(profileData);
@@ -443,11 +529,11 @@ export const AppProvider = ({ children }) => {
       uploadedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
       uploadedBy: currentUser?.name || 'موظف'
     };
-    setFiles(prev => [newFile, ...prev]);
+    setDoc(doc(db, 'files', String(newFile.id)), newFile);
   }, [currentUser]);
 
   const deleteFile = useCallback((fileId) => {
-    setFiles(prev => prev.filter(f => f.id !== Number(fileId)));
+    deleteDoc(doc(db, 'files', String(fileId)));
   }, []);
 
   // Clients CRUD
@@ -459,14 +545,18 @@ export const AppProvider = ({ children }) => {
       bookingsCount: 0,
       totalSpent: 0
     };
-    setClients(prev => [newClient, ...prev]);
+    setDoc(doc(db, 'clients', String(newClient.id)), newClient);
     addAuditLog('إضافة عميل', `تم تسجيل عميل جديد: ${newClient.name}`, '👤');
   }, [addAuditLog]);
 
   const updateClient = useCallback((clientId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
-    setClients(prev => prev.map(c => c.id === Number(clientId) ? { ...c, ...sanitizedFields } : c));
-  }, []);
+    const target = clients.find(c => c.id === Number(clientId));
+    if (target) {
+      const merged = { ...target, ...sanitizedFields };
+      setDoc(doc(db, 'clients', String(clientId)), merged);
+    }
+  }, [clients]);
 
   // Freelancers CRUD
   const addFreelancer = useCallback((freelancerData) => {
@@ -477,20 +567,28 @@ export const AppProvider = ({ children }) => {
       bookingsCount: 0,
       totalSpent: 0
     };
-    setFreelancers(prev => [newFreelancer, ...prev]);
+    setDoc(doc(db, 'freelancers', String(newFreelancer.id)), newFreelancer);
     addAuditLog('إضافة مصور فريلانسر', `تم تسجيل مصور فريلانسر جديد: ${newFreelancer.name}`, '👤');
     return newFreelancer;
   }, [addAuditLog]);
 
   const updateFreelancer = useCallback((freelancerId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
-    setFreelancers(prev => prev.map(f => f.id === Number(freelancerId) ? { ...f, ...sanitizedFields } : f));
-  }, []);
+    const target = freelancers.find(f => f.id === Number(freelancerId));
+    if (target) {
+      const merged = { ...target, ...sanitizedFields };
+      setDoc(doc(db, 'freelancers', String(freelancerId)), merged);
+    }
+  }, [freelancers]);
 
   // Equipment actions
   const updateEquipment = useCallback((equipmentId, updatedFields) => {
-    setEquipment(prev => prev.map(e => e.id === Number(equipmentId) ? { ...e, ...updatedFields } : e));
-  }, []);
+    const target = equipment.find(e => e.id === Number(equipmentId));
+    if (target) {
+      const merged = { ...target, ...updatedFields };
+      setDoc(doc(db, 'equipment', String(equipmentId)), merged);
+    }
+  }, [equipment]);
 
   // Team CRUD
   const addTeamMember = useCallback((memberData) => {
@@ -503,25 +601,33 @@ export const AppProvider = ({ children }) => {
       points: 100,
       status: 'نشط'
     };
-    setTeam(prev => [...prev, newMember]);
+    setDoc(doc(db, 'team', String(newMember.id)), newMember);
     addAuditLog('إضافة موظف', `تم إضافة موظف جديد: ${newMember.name}`, '👥');
   }, [addAuditLog]);
 
   const updateTeamMember = useCallback((memberId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
-    setTeam(prev => prev.map(m => m.id === Number(memberId) ? { ...m, ...sanitizedFields } : m));
-    addAuditLog('تحديث بيانات موظف', `تم تحديث بيانات الموظف #${memberId}`, '✏️');
-  }, [addAuditLog]);
+    const target = team.find(m => m.id === Number(memberId));
+    if (target) {
+      const merged = { ...target, ...sanitizedFields };
+      setDoc(doc(db, 'team', String(memberId)), merged);
+      addAuditLog('تحديث بيانات موظف', `تم تحديث بيانات الموظف #${memberId}`, '✏️');
+    }
+  }, [addAuditLog, team]);
 
   const deleteTeamMember = useCallback((memberId) => {
-    setTeam(prev => prev.filter(m => m.id !== Number(memberId)));
+    deleteDoc(doc(db, 'team', String(memberId)));
     addAuditLog('حذف موظف', `تم حذف الموظف #${memberId}`, '🗑️');
   }, [addAuditLog]);
 
   const toggleSupervisorRole = useCallback((memberId) => {
-    setTeam(prev => prev.map(m => m.id === Number(memberId) ? { ...m, isSupervisor: !m.isSupervisor } : m));
-    addAuditLog('تغيير صلاحيات الموظف', `تم تغيير صلاحيات الموظف #${memberId}`, '👑');
-  }, [addAuditLog]);
+    const target = team.find(m => m.id === Number(memberId));
+    if (target) {
+      const merged = { ...target, isSupervisor: !target.isSupervisor };
+      setDoc(doc(db, 'team', String(memberId)), merged);
+      addAuditLog('تغيير صلاحيات الموظف', `تم تغيير صلاحيات الموظف #${memberId}`, '👑');
+    }
+  }, [addAuditLog, team]);
 
   // Contracts CRUD
   const addContract = useCallback((contractData) => {
@@ -536,28 +642,27 @@ export const AppProvider = ({ children }) => {
       signatureData: '',
       ...sanitizedData
     };
-    setContracts(prev => [newContract, ...prev]);
+    setDoc(doc(db, 'contracts', String(newContract.id)), newContract);
     addAuditLog('إنشاء عقد', `إنشاء العقد #${newContract.contractNumber} للحجز ${contractData.bookingTitle}`, '📄');
     addNotification('عقد جديد 📄', `تم إنشاء عقد جديد للحجز ${contractData.bookingTitle}`, 'booking');
   }, [contracts, addAuditLog, addNotification]);
 
   const signContract = useCallback((contractId, signatureData, signedByName) => {
     const sanitizedName = toEnglishDigits(signedByName);
-    setContracts(prev => prev.map(c => {
-      if (c.id === Number(contractId)) {
-        addAuditLog('توقيع عقد', `تم توقيع العقد #${c.contractNumber} بواسطة ${sanitizedName}`, '✍️');
-        addNotification('توقيع عقد ✍️', `تم توقيع العقد #${c.contractNumber} بنجاح!`, 'booking');
-        return {
-          ...c,
-          status: 'تم التوقيع',
-          signedByClient: sanitizedName,
-          signedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
-          signatureData
-        };
-      }
-      return c;
-    }));
-  }, [addAuditLog, addNotification]);
+    const target = contracts.find(c => c.id === Number(contractId));
+    if (target) {
+      const merged = {
+        ...target,
+        status: 'تم التوقيع',
+        signedByClient: sanitizedName,
+        signedAt: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        signatureData
+      };
+      setDoc(doc(db, 'contracts', String(contractId)), merged);
+      addAuditLog('توقيع عقد', `تم توقيع العقد #${target.contractNumber} بواسطة ${sanitizedName}`, '✍️');
+      addNotification('توقيع عقد ✍️', `تم توقيع العقد #${target.contractNumber} بنجاح!`, 'booking');
+    }
+  }, [contracts, addAuditLog, addNotification]);
 
   // Invoices CRUD
   const addInvoice = useCallback((invoiceData) => {
@@ -567,13 +672,17 @@ export const AppProvider = ({ children }) => {
       id: Date.now(),
       invoiceNumber: `INV-2026-${Math.floor(Math.random() * 900) + 100}`
     };
-    setInvoices(prev => [newInvoice, ...prev]);
+    setDoc(doc(db, 'invoices', String(newInvoice.id)), newInvoice);
   }, []);
 
   const updateInvoice = useCallback((invoiceId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
-    setInvoices(prev => prev.map(inv => inv.id === Number(invoiceId) ? { ...inv, ...sanitizedFields } : inv));
-  }, []);
+    const target = invoices.find(inv => inv.id === Number(invoiceId));
+    if (target) {
+      const merged = { ...target, ...sanitizedFields };
+      setDoc(doc(db, 'invoices', String(invoiceId)), merged);
+    }
+  }, [invoices]);
 
   const addPayment = useCallback((paymentData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(paymentData);
@@ -581,7 +690,7 @@ export const AppProvider = ({ children }) => {
       ...sanitizedData,
       id: Date.now()
     };
-    setPayments(prev => [newPayment, ...prev]);
+    setDoc(doc(db, 'payments', String(newPayment.id)), newPayment);
     addAuditLog('تسجيل دفعة', `تم تسجيل دفعة بقيمة ${sanitizedData.amount} ريال`, '💰');
     showCelebration('تم تسجيل الدفعة المالية بنجاح! 💰');
   }, [addAuditLog]);
@@ -592,23 +701,26 @@ export const AppProvider = ({ children }) => {
       ...sanitizedData,
       id: Date.now()
     };
-    setExpenses(prev => [newExpense, ...prev]);
+    setDoc(doc(db, 'expenses', String(newExpense.id)), newExpense);
     addAuditLog('تسجيل مصروفات', `تم تسجيل مصروف بقيمة ${sanitizedData.amount} ريال`, '💸');
   }, [addAuditLog]);
 
   const updateSettings = useCallback((newSettings) => {
     const sanitizedSettings = sanitizeObjectToEnglishDigits(newSettings);
-    setSettings(sanitizedSettings);
+    setDoc(doc(db, 'settings', 'defaultConfig'), sanitizedSettings);
     addAuditLog('تعديل الإعدادات', 'تم تحديث إعدادات النظام والهوية البصرية', '⚙️');
   }, [addAuditLog]);
 
   const markNotificationAsRead = useCallback((notificationId) => {
-    setNotifications(prev => prev.map(n => n.id === Number(notificationId) ? { ...n, read: true } : n));
-  }, []);
+    const target = notifications.find(n => n.id === Number(notificationId));
+    if (target) {
+      setDoc(doc(db, 'notifications', String(notificationId)), { ...target, read: true });
+    }
+  }, [notifications]);
 
   const handleNotificationClick = (notif) => {
     if (!notif) return;
-    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    setDoc(doc(db, 'notifications', String(notif.id)), { ...notif, read: true });
 
     const targetType = notif.entityType || (notif.type === 'booking' || notif.title.includes('حجز') ? 'booking' : notif.type === 'task' || notif.title.includes('مهمة') ? 'task' : notif.type === 'equipment' || notif.title.includes('معدة') ? 'equipment' : 'general');
     const targetId = notif.entityId || notif.bookingId;
@@ -622,23 +734,23 @@ export const AppProvider = ({ children }) => {
           setIsBookingDetailOpen(true);
         }
       }
-      navigateTo('/admin/bookings');
     } else if (targetType === 'task') {
       setActiveTab('tasks');
-      navigateTo('/admin/tasks');
     } else if (targetType === 'equipment') {
       setActiveTab('equipment');
-      navigateTo('/admin/equipment');
     } else if (targetType === 'invoice') {
       setActiveTab('invoices');
-      navigateTo('/admin/invoices');
     } else {
       setActiveTab('dashboard');
     }
   };
 
   const markAllNotificationsAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    notifications.forEach(n => {
+      if (!n.read) {
+        setDoc(doc(db, 'notifications', String(n.id)), { ...n, read: true });
+      }
+    });
   };
 
   const checkBookingConflicts = (date, startTime, endTime, assignedTeam = [], assignedEquipment = [], currentBookingId = null, endDate = null) => {
@@ -662,18 +774,15 @@ export const AppProvider = ({ children }) => {
       const bStartDay = b.startDate || b.date;
       const bEndDay = b.endDate || b.date || bStartDay;
 
-      // Check date overlap
       const hasDateOverlap = (startDay <= bEndDay && endDay >= bStartDay);
       if (!hasDateOverlap) return;
 
       const bStart = toMinutes(b.startTime || '00:00');
       const bEnd = toMinutes(b.endTime || '23:59');
 
-      // Check time overlap
       const hasTimeOverlap = (newStart < bEnd && newEnd > bStart);
 
       if (hasTimeOverlap) {
-        // Team conflict check
         const bTeam = b.teamMemberIds || b.teamAssigned || [];
         bTeam.forEach(tId => {
           if (assignedTeam.includes(tId)) {
@@ -684,7 +793,6 @@ export const AppProvider = ({ children }) => {
           }
         });
 
-        // Equipment conflict check
         const bEquip = b.equipmentAssigned || [];
         bEquip.forEach(eId => {
           if (assignedEquipment.includes(eId)) {
@@ -732,13 +840,13 @@ export const AppProvider = ({ children }) => {
       id: Date.now(),
       ...item
     };
-    setWaitlist(prev => [...prev, newItem]);
+    setDoc(doc(db, 'waitlist', String(newItem.id)), newItem);
     addAuditLog('إضافة لقائمة الانتظار', `تم إضافة ${newItem.clientName} إلى قائمة الانتظار لتاريخ ${newItem.date}`, '⏳');
     showCelebration('تمت الإضافة لقائمة الانتظار بنجاح! ⏳');
   }, [addAuditLog]);
 
   const removeFromWaitlist = useCallback((waitlistId) => {
-    setWaitlist(prev => prev.filter(w => w.id !== Number(waitlistId)));
+    deleteDoc(doc(db, 'waitlist', String(waitlistId)));
     addAuditLog('حذف من قائمة الانتظار', `إزالة طلب من قائمة الانتظار #${waitlistId}`, '🗑️');
   }, [addAuditLog]);
 
@@ -749,7 +857,7 @@ export const AppProvider = ({ children }) => {
       status: 'بانتظار العميل',
       ...quoteData
     };
-    setQuotations(prev => [newItem, ...prev]);
+    setDoc(doc(db, 'quotations', String(newItem.id)), newItem);
     addAuditLog('إنشاء عرض سعر', `تم إنشاء عرض سعر جديد لـ ${quoteData.clientName}`, '📄');
     showCelebration('تم إنشاء عرض السعر بنجاح! 📄');
     return newItem;
@@ -759,7 +867,7 @@ export const AppProvider = ({ children }) => {
     const quote = quotations.find(q => q.id === Number(quoteId));
     if (!quote) return;
 
-    setQuotations(prev => prev.map(q => q.id === Number(quoteId) ? { ...q, status: 'مقبول' } : q));
+    setDoc(doc(db, 'quotations', String(quoteId)), { ...quote, status: 'مقبول' });
 
     const booking = addBooking({
       clientName: quote.clientName,
