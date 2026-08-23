@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>منظومة العهد | منصة إدارة استوديوهات وثق وصناع المحتوى</title>
+    <meta name="theme-color" content="#4338ca" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="LensFlow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script>
+      window.addEventListener('error', function(event) {
+        setTimeout(function() {
+          var errorDiv = document.createElement('div');
+          errorDiv.style.position = 'fixed';
+          errorDiv.style.top = '0';
+          errorDiv.style.left = '0';
+          errorDiv.style.width = '100%';
+          errorDiv.style.height = '100%';
+          errorDiv.style.backgroundColor = 'rgba(0,0,0,0.95)';
+          errorDiv.style.color = '#ff6b6b';
+          errorDiv.style.padding = '20px';
+          errorDiv.style.zIndex = '999999';
+          errorDiv.style.overflow = 'auto';
+          errorDiv.style.fontFamily = 'monospace';
+          errorDiv.style.fontSize = '14px';
+          errorDiv.style.whiteSpace = 'pre-wrap';
+          errorDiv.innerHTML = '<h1 style="color:#ff4757;margin-top:0;">حَدَث خطأ في التشغيل (Runtime Error)</h1>' +
+            '<strong>الرسالة:</strong> ' + event.message + '<br><br>' +
+            '<strong>الملف:</strong> ' + event.filename + ':' + event.lineno + ':' + event.colno + '<br><br>' +
+            '<strong>الخطأ كاملًا:</strong><br>' + (event.error ? event.error.stack : 'لا يوجد تفاصيل إضافية');
+          if (document.body) {
+            document.body.appendChild(errorDiv);
+          } else {
+            document.documentElement.appendChild(errorDiv);
+          }
+        }, 100);
+      });
+      window.addEventListener('unhandledrejection', function(event) {
+        setTimeout(function() {
+          var errorDiv = document.createElement('div');
+          errorDiv.style.position = 'fixed';
+          errorDiv.style.top = '0';
+          errorDiv.style.left = '0';
+          errorDiv.style.width = '100%';
+          errorDiv.style.height = '100%';
+          errorDiv.style.backgroundColor = 'rgba(0,0,0,0.95)';
+          errorDiv.style.color = '#ff6b6b';
+          errorDiv.style.padding = '20px';
+          errorDiv.style.zIndex = '999999';
+          errorDiv.style.overflow = 'auto';
+          errorDiv.style.fontFamily = 'monospace';
+          errorDiv.style.fontSize = '14px';
+          errorDiv.style.whiteSpace = 'pre-wrap';
+          errorDiv.innerHTML = '<h1 style="color:#ff4757;margin-top:0;">حَدَث خطأ غير معالج (Unhandled Promise Rejection)</h1>' +
+            '<strong>السبب:</strong> ' + event.reason + '<br><br>' +
+            '<strong>الخطأ كاملًا:</strong><br>' + (event.reason ? (event.reason.stack || event.reason) : 'لا يوجد تفاصيل إضافية');
+          if (document.body) {
+            document.body.appendChild(errorDiv);
+          } else {
+            document.documentElement.appendChild(errorDiv);
+          }
+        }, 100);
+      });
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
