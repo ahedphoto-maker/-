@@ -22,21 +22,10 @@ export const Topbar = ({ onOpenMobileSidebar }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  const [theme, setTheme] = useState(() => {
-    if (typeof window !== 'undefined') {
-      return localStorage.getItem('star_media_theme') || 'light';
-    }
-    return 'light';
-  });
-
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('star_media_theme', theme);
-  }, [theme]);
-
-  const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
-  };
+    document.documentElement.setAttribute('data-theme', 'light');
+    localStorage.setItem('star_media_theme', 'light');
+  }, []);
 
   const unreadCount = notifications ? notifications.filter(n => !n.read).length : 0;
 
@@ -177,27 +166,7 @@ export const Topbar = ({ onOpenMobileSidebar }) => {
             </button>
           )}
 
-          {/* Theme Toggle Button */}
-          <button
-            onClick={toggleTheme}
-            className="btn btn-secondary btn-icon icon-button"
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: '50%',
-              flexShrink: 0,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: 'var(--bg-main)',
-              border: '1px solid var(--border-color)',
-              color: 'var(--text-main)'
-            }}
-            title={theme === 'dark' ? 'تفعيل الوضع المضيء (صباحي)' : 'تفعيل الوضع الداكن (مسائي)'}
-            aria-label="تغيير السمة"
-          >
-            {theme === 'dark' ? <Icons.Sun size={18} /> : <Icons.Moon size={18} />}
-          </button>
+
 
           {/* Notifications Bell Icon Button (Mobile & Desktop) */}
           <button
