@@ -1,5 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, enableIndexedDbPersistence } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
   projectId: "al-ahad-app-2026",
@@ -13,6 +14,7 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
 
 // Enable offline persistence
 if (typeof window !== "undefined") {
@@ -25,4 +27,4 @@ if (typeof window !== "undefined") {
   });
 }
 
-export { db };
+export { db, auth };

@@ -18,7 +18,8 @@ import {
   initialBookings
 } from '../data/mockData';
 import { triggerCelebration, toEnglishDigits, sanitizeObjectToEnglishDigits } from '../utils/helpers';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
+import { signInAnonymously } from 'firebase/auth';
 import { 
   collection, 
   onSnapshot, 
@@ -124,8 +125,25 @@ export const AppProvider = ({ children }) => {
   const [isOnline, setIsOnline] = useState(() => getStoredState('star_media_isOnline', true));
   const [pendingOfflineActions, setPendingOfflineActions] = useState(() => getStoredState('star_media_pendingOfflineActions', []));
 
+  const [isDbReady, setIsDbReady] = useState(false);
+
+  // Force anonymous authentication on mount to access secure Firestore rules
+  useEffect(() => {
+    signInAnonymously(auth)
+      .then((userCredential) => {
+        console.log("Authenticated anonymously with Firebase:", userCredential.user.uid);
+        setIsDbReady(true);
+      })
+      .catch((err) => {
+        console.error("Anonymous authentication failed. Please make sure Anonymous Auth is enabled in the Firebase Console.", err);
+        // Fallback: set DbReady to true so the app still attempts to load (e.g. offline fallback cache)
+        setIsDbReady(true);
+      });
+  }, []);
+
   // Real-time Firestore synchronization & automatic seeding
   useEffect(() => {
+    if (!isDbReady) return;
     const collectionsToSync = [
       { name: 'team', stateSetter: setTeam, initialData: initialTeam },
       { name: 'clients', stateSetter: setClients, initialData: initialClients },
@@ -200,7 +218,7 @@ export const AppProvider = ({ children }) => {
       unsubscribes.forEach(unsub => unsub());
       unsubSettings();
     };
-  }, []);
+  }, [isDbReady]);
 
   // Write changes to localStorage as a redundant secondary cache
   useEffect(() => { localStorage.setItem('star_media_team', JSON.stringify(team)); }, [team]);
