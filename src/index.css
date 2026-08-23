@@ -69,6 +69,12 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent !important;
+  outline: none !important;
+}
+
+*:focus, *:focus-visible, *:active {
+  outline: none !important;
 }
 
 body {
