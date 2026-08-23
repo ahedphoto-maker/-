@@ -365,7 +365,12 @@ export const AppProvider = ({ children }) => {
         changeLogs: [
           { timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19), userName: currentUser?.name || 'النظام', action: 'إنشاء الحجز' }
         ],
-        locked: sanitizedData.status === 'مؤكد'
+        locked: sanitizedData.status === 'مؤكد',
+        userId: auth.currentUser?.uid || null,
+        ownerId: auth.currentUser?.uid || null,
+        creatorId: auth.currentUser?.uid || null,
+        uid: auth.currentUser?.uid || null,
+        role: userRole || 'employee'
       };
     });
 
