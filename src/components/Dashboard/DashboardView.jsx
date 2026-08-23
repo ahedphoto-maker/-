@@ -101,13 +101,12 @@ export const DashboardView = () => {
       {/* 🌟 ASSISTANT WIDGET: صباح الخير 👋 */}
       <div 
         style={{
-          background: 'linear-gradient(135deg, rgba(20, 27, 38, 0.8) 0%, rgba(11, 15, 23, 0.95) 100%)',
-          borderRight: '5px solid #6366f1',
+          background: 'linear-gradient(135deg, var(--bg-card) 0%, var(--primary-light) 100%)',
+          borderRight: '5px solid var(--primary-color)',
           borderRadius: '16px',
           padding: '20px',
-          boxShadow: '0 8px 32px rgba(139, 92, 246, 0.08)',
-          backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(139, 92, 246, 0.12)',
+          boxShadow: 'var(--card-shadow)',
+          border: '1px solid var(--border-color)',
           display: 'flex',
           flexDirection: 'column',
           gap: '14px'
@@ -116,18 +115,18 @@ export const DashboardView = () => {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '10px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <div style={{ width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 12px rgba(99, 102, 241, 0.3)' }}>
-              <Icons.Sparkles size={20} color="#a78bfa" />
+              <Icons.Sparkles size={20} color="var(--primary-color)" />
             </div>
             <div>
-              <h1 style={{ fontSize: '1.2rem', fontWeight: 900, color: '#f1f5f9', margin: 0 }}>
+              <h1 style={{ fontSize: '1.2rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>
                 صباح الخير، {currentUser?.name ? currentUser.name.split(' ')[0] : 'عاهد'} 👋
               </h1>
-              <p style={{ color: '#94a3b8', fontSize: '0.82rem', margin: '4px 0 0 0' }}>
-                لديك اليوم <strong style={{ color: '#818cf8' }}>{todayBookings.length} حجوزات تصوير</strong> و <strong style={{ color: '#fbbf24' }}>{pendingTodayTasks.length} مهام معلقة</strong> تحتاج متابعة.
+              <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem', margin: '4px 0 0 0' }}>
+                لديك اليوم <strong style={{ color: 'var(--primary-color)' }}>{todayBookings.length} حجوزات تصوير</strong> و <strong style={{ color: 'var(--status-warning)' }}>{pendingTodayTasks.length} مهام معلقة</strong> تحتاج متابعة.
               </p>
             </div>
           </div>
-          <span className="badge badge-info en-digits" style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '5px 12px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 700 }}>
+          <span className="badge badge-info en-digits" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', border: '1px solid var(--border-color)', padding: '5px 12px', borderRadius: '50px', fontSize: '0.8rem', fontWeight: 700 }}>
             {todayStr}
           </span>
         </div>
@@ -225,97 +224,97 @@ export const DashboardView = () => {
       >
         {/* Stat 1: Revenue */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.05) 0%, rgba(20, 27, 38, 0.75) 100%)',
-          border: '1px solid rgba(244, 63, 94, 0.18)',
+          background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.03) 0%, var(--bg-card) 100%)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: isMobile ? '12px' : '18px 20px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          boxShadow: '0 8px 32px rgba(244, 63, 94, 0.03)',
+          boxShadow: 'var(--card-shadow)',
           backdropFilter: 'blur(10px)'
         }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icons.Coins size={20} color="#f43f5e" />
           </div>
           <div>
-            <span style={{ fontSize: '0.76rem', color: '#94a3b8', display: 'block' }}>الإيرادات</span>
-            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: '#f1f5f9' }}>
+            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block' }}>الإيرادات</span>
+            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: 'var(--text-main)' }}>
               {privacyMode ? '••••' : formatCurrency(totalRevenue).replace(' ريال', '')}
             </strong>
-            <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '1px' }}>إجمالي الدخل</span>
+            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', marginTop: '1px' }}>إجمالي الدخل</span>
           </div>
         </div>
 
         {/* Stat 2: Bookings */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.05) 0%, rgba(20, 27, 38, 0.75) 100%)',
-          border: '1px solid rgba(99, 102, 241, 0.18)',
+          background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.03) 0%, var(--bg-card) 100%)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: isMobile ? '12px' : '18px 20px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          boxShadow: '0 8px 32px rgba(99, 102, 241, 0.03)',
+          boxShadow: 'var(--card-shadow)',
           backdropFilter: 'blur(10px)'
         }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(99, 102, 241, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icons.CalendarCheck size={20} color="#818cf8" />
           </div>
           <div>
-            <span style={{ fontSize: '0.76rem', color: '#94a3b8', display: 'block' }}>الحجوزات</span>
-            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: '#f1f5f9' }}>
+            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block' }}>الحجوزات</span>
+            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: 'var(--text-main)' }}>
               {totalBookingsCount}
             </strong>
-            <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '1px' }}>{upcomingBookingsCount} جلسة قادمة</span>
+            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', marginTop: '1px' }}>{upcomingBookingsCount} جلسة قادمة</span>
           </div>
         </div>
 
         {/* Stat 3: Projects */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.05) 0%, rgba(20, 27, 38, 0.75) 100%)',
-          border: '1px solid rgba(16, 185, 129, 0.18)',
+          background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.03) 0%, var(--bg-card) 100%)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: isMobile ? '12px' : '18px 20px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          boxShadow: '0 8px 32px rgba(16, 185, 129, 0.03)',
+          boxShadow: 'var(--card-shadow)',
           backdropFilter: 'blur(10px)'
         }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icons.Briefcase size={20} color="#34d399" />
           </div>
           <div>
-            <span style={{ fontSize: '0.76rem', color: '#94a3b8', display: 'block' }}>المشاريع</span>
-            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: '#f1f5f9' }}>
+            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block' }}>المشاريع</span>
+            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: 'var(--text-main)' }}>
               {activeProjectsCount}
             </strong>
-            <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '1px' }}>مشاريع قيد العمل</span>
+            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', marginTop: '1px' }}>مشاريع قيد العمل</span>
           </div>
         </div>
 
         {/* Stat 4: Tasks */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, rgba(20, 27, 38, 0.75) 100%)',
-          border: '1px solid rgba(245, 158, 11, 0.18)',
+          background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.03) 0%, var(--bg-card) 100%)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: isMobile ? '12px' : '18px 20px',
           display: 'flex',
           alignItems: 'center',
           gap: '12px',
-          boxShadow: '0 8px 32px rgba(245, 158, 11, 0.03)',
+          boxShadow: 'var(--card-shadow)',
           backdropFilter: 'blur(10px)'
         }}>
           <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(245, 158, 11, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             <Icons.CheckSquare size={20} color="#fbbf24" />
           </div>
           <div>
-            <span style={{ fontSize: '0.76rem', color: '#94a3b8', display: 'block' }}>المهام اليومية</span>
-            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: '#f1f5f9' }}>
+            <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', display: 'block' }}>المهام اليومية</span>
+            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: 'var(--text-main)' }}>
               {pendingTodayTasks.length}
             </strong>
-            <span style={{ fontSize: '0.64rem', color: '#64748b', display: 'block', marginTop: '1px' }}>مهام معلقة اليوم</span>
+            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', marginTop: '1px' }}>مهام معلقة اليوم</span>
           </div>
         </div>
       </div>
@@ -323,18 +322,18 @@ export const DashboardView = () => {
       {/* ⚡ QUICK ACTIONS SECTION: قسم الإجراءات السريعة الأنيق */}
       <div 
         style={{
-          background: 'rgba(20, 27, 38, 0.7)',
-          border: '1px solid rgba(139, 92, 246, 0.1)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: '16px',
           display: 'flex',
           flexDirection: 'column',
           gap: '12px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)'
+          boxShadow: 'var(--card-shadow)'
         }}
       >
-        <h3 style={{ fontSize: '0.98rem', fontWeight: 900, color: '#f1f5f9', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-          <Icons.Zap size={16} color="#6366f1" />
+        <h3 style={{ fontSize: '0.98rem', fontWeight: 900, color: 'var(--text-main)', margin: '0 0 4px 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <Icons.Zap size={16} color="var(--primary-color)" />
           <span>إجراءات سريعة</span>
         </h3>
         
@@ -350,8 +349,8 @@ export const DashboardView = () => {
             onClick={() => setIsBookingFormOpen(true)}
             className="card-interactive"
             style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(99, 102, 241, 0.15)',
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-color)',
               borderRadius: '12px',
               padding: '14px 10px',
               display: 'flex',
@@ -367,7 +366,7 @@ export const DashboardView = () => {
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(99, 102, 241, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(99, 102, 241, 0.2)' }}>
               <Icons.PlusCircle size={18} color="#818cf8" />
             </div>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#e2e8f0' }}>حجز جديد</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>حجز جديد</span>
           </div>
 
           {/* Action 2: Add Task */}
@@ -375,8 +374,8 @@ export const DashboardView = () => {
             onClick={() => setActiveTab('tasks')}
             className="card-interactive"
             style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(245, 158, 11, 0.15)',
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-color)',
               borderRadius: '12px',
               padding: '14px 10px',
               display: 'flex',
@@ -392,7 +391,7 @@ export const DashboardView = () => {
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(245, 158, 11, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(245, 158, 11, 0.2)' }}>
               <Icons.CheckSquare size={18} color="#fbbf24" />
             </div>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#e2e8f0' }}>جدولة مهمة</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>جدولة مهمة</span>
           </div>
 
           {/* Action 3: Add Client */}
@@ -400,8 +399,8 @@ export const DashboardView = () => {
             onClick={() => setActiveTab('clients')}
             className="card-interactive"
             style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(16, 185, 129, 0.15)',
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-color)',
               borderRadius: '12px',
               padding: '14px 10px',
               display: 'flex',
@@ -417,7 +416,7 @@ export const DashboardView = () => {
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(16, 185, 129, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(16, 185, 129, 0.2)' }}>
               <Icons.UserPlus size={18} color="#34d399" />
             </div>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#e2e8f0' }}>إضافة عميل</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>إضافة عميل</span>
           </div>
 
           {/* Action 4: Financials */}
@@ -425,8 +424,8 @@ export const DashboardView = () => {
             onClick={() => setActiveTab('invoices')}
             className="card-interactive"
             style={{
-              background: 'rgba(255, 255, 255, 0.02)',
-              border: '1px solid rgba(6, 182, 212, 0.15)',
+              background: 'var(--bg-main)',
+              border: '1px solid var(--border-color)',
               borderRadius: '12px',
               padding: '14px 10px',
               display: 'flex',
@@ -442,7 +441,7 @@ export const DashboardView = () => {
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(6, 182, 212, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 0 10px rgba(6, 182, 212, 0.2)' }}>
               <Icons.FileText size={18} color="#22d3ee" />
             </div>
-            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#e2e8f0' }}>المالية والتقارير</span>
+            <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>المالية والتقارير</span>
           </div>
         </div>
       </div>
@@ -450,11 +449,11 @@ export const DashboardView = () => {
       {/* 🌟 TODAY'S TIMELINE SECTION: ماذا لدي اليوم؟ */}
       <div 
         style={{ 
-          background: 'rgba(20, 27, 38, 0.7)',
-          border: '1px solid rgba(139, 92, 246, 0.1)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: '20px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+          boxShadow: 'var(--card-shadow)',
           display: 'flex', 
           flexDirection: 'column', 
           gap: '16px' 
@@ -462,23 +461,23 @@ export const DashboardView = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icons.CalendarCheck size={18} color="#818cf8" />
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icons.CalendarCheck size={18} color="var(--primary-color)" />
             </div>
-            <h3 style={{ fontSize: '1.02rem', fontWeight: 900, margin: 0, color: '#f1f5f9' }}>ماذا لدي اليوم؟ (الجدول والخط الزمني لليوم)</h3>
+            <h3 style={{ fontSize: '1.02rem', fontWeight: 900, margin: 0, color: 'var(--text-main)' }}>ماذا لدي اليوم؟ (الجدول والخط الزمني لليوم)</h3>
           </div>
-          <span className="badge badge-info en-digits" style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '4px 10px', borderRadius: '50px', fontSize: '0.78rem', fontWeight: 700 }}>
+          <span className="badge badge-info en-digits" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', border: '1px solid var(--border-color)', padding: '4px 10px', borderRadius: '50px', fontSize: '0.78rem', fontWeight: 700 }}>
             {todayBookings.length} تغطيات
           </span>
         </div>
 
         {todayBookings.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
-            <Icons.Calendar size={36} style={{ opacity: 0.3, color: '#94a3b8' }} />
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+            <Icons.Calendar size={36} style={{ opacity: 0.3, color: 'var(--text-muted)' }} />
             <p style={{ fontSize: '0.86rem', margin: 0 }}>لا توجد حجوزات أو جلسات تصوير مسجلة اليوم.</p>
           </div>
         ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingRight: '22px', borderRight: '2px solid rgba(139, 92, 246, 0.15)', marginTop: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', position: 'relative', paddingRight: '22px', borderRight: '2px solid var(--border-color)', marginTop: '8px' }}>
             {todayBookings.map((b, idx) => {
               const bookingNum = formatBookingNumber(b.bookingNumber);
               const remaining = b.remainingAmount !== undefined ? b.remainingAmount : (b.totalPrice || 0) - (b.paidAmount || 0);
@@ -498,11 +497,11 @@ export const DashboardView = () => {
                     gap: '10px',
                     padding: '16px',
                     borderRadius: '14px',
-                    border: '1px solid rgba(139, 92, 246, 0.12)',
-                    backgroundColor: 'rgba(20, 27, 38, 0.75)',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-main)',
                     cursor: 'pointer',
                     transition: 'transform 0.2s ease, borderColor 0.2s ease',
-                    boxShadow: '0 8px 24px rgba(0,0,0,0.2)'
+                    boxShadow: 'none'
                   }}
                 >
                   {/* Connector node indicator */}
@@ -515,7 +514,7 @@ export const DashboardView = () => {
                       height: '14px',
                       borderRadius: '50%',
                       backgroundColor: '#6366f1',
-                      border: '3px solid #0b0f17',
+                      border: '3px solid var(--bg-card)',
                       boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.25)',
                       zIndex: 2
                     }}
@@ -524,15 +523,15 @@ export const DashboardView = () => {
                   {/* Header info row */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span className="en-digits" style={{ fontWeight: 900, color: '#818cf8', fontSize: '0.88rem' }}>
+                      <span className="en-digits" style={{ fontWeight: 900, color: 'var(--primary-color)', fontSize: '0.88rem' }}>
                         {b.startTime} - {b.endTime}
                       </span>
-                      <span className="badge en-digits" style={{ fontSize: '0.7rem', backgroundColor: 'rgba(255, 255, 255, 0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.06)' }}>#{bookingNum}</span>
+                      <span className="badge en-digits" style={{ fontSize: '0.7rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-muted)', border: '1px solid var(--border-color)' }}>#{bookingNum}</span>
                       <StatusBadge status={b.status} />
                       {b.readinessStatus && <span className="badge badge-info" style={{ fontSize: '0.7rem' }}>{b.readinessStatus}</span>}
                     </div>
                     {b.totalPrice !== null && !privacyMode && (
-                      <span className="en-digits" style={{ fontSize: '0.78rem', fontWeight: 800, color: remaining > 0 ? '#fca5a5' : '#34d399' }}>
+                      <span className="en-digits" style={{ fontSize: '0.78rem', fontWeight: 800, color: remaining > 0 ? 'var(--status-danger)' : 'var(--status-success)' }}>
                         {remaining > 0 ? `متبقي: ${formatCurrency(remaining).replace(' ريال', '')} ريال` : 'مدفوع بالكامل'}
                       </span>
                     )}
@@ -540,8 +539,8 @@ export const DashboardView = () => {
 
                   {/* Title and details */}
                   <div>
-                    <h4 style={{ fontSize: '0.92rem', fontWeight: 900, margin: '4px 0', color: '#f1f5f9' }}>{b.title}</h4>
-                    <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '0.78rem', color: '#94a3b8', marginTop: '4px' }}>
+                    <h4 style={{ fontSize: '0.92rem', fontWeight: 900, margin: '4px 0', color: 'var(--text-main)' }}>{b.title}</h4>
+                    <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap', fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <Icons.User size={13} color="#818cf8" />
                         <span>العميل: <strong>{b.clientName}</strong></span>
@@ -567,11 +566,11 @@ export const DashboardView = () => {
       {/* 🌟 UPCOMING BOOKINGS SECTION: الحجوزات القادمة */}
       <div 
         style={{ 
-          background: 'rgba(20, 27, 38, 0.7)',
-          border: '1px solid rgba(139, 92, 246, 0.1)',
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-color)',
           borderRadius: '16px',
           padding: '20px',
-          boxShadow: '0 8px 32px rgba(0, 0, 0, 0.15)',
+          boxShadow: 'var(--card-shadow)',
           display: 'flex', 
           flexDirection: 'column', 
           gap: '16px' 
@@ -579,19 +578,19 @@ export const DashboardView = () => {
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'rgba(99, 102, 241, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Icons.Calendar size={18} color="#818cf8" />
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: 'var(--primary-light)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Icons.Calendar size={18} color="var(--primary-color)" />
             </div>
-            <h3 style={{ fontSize: '1.02rem', fontWeight: 900, margin: 0, color: '#f1f5f9' }}>الحجوزات وجلسات التصوير القادمة</h3>
+            <h3 style={{ fontSize: '1.02rem', fontWeight: 900, margin: 0, color: 'var(--text-main)' }}>الحجوزات وجلسات التصوير القادمة</h3>
           </div>
-          <span className="badge badge-info en-digits" style={{ backgroundColor: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', border: '1px solid rgba(99, 102, 241, 0.3)', padding: '4px 10px', borderRadius: '50px', fontSize: '0.78rem', fontWeight: 700 }}>
+          <span className="badge badge-info en-digits" style={{ backgroundColor: 'var(--primary-light)', color: 'var(--primary-color)', border: '1px solid var(--border-color)', padding: '4px 10px', borderRadius: '50px', fontSize: '0.78rem', fontWeight: 700 }}>
             {upcomingBookingsCount} جلسة
           </span>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
           {upcomingBookings.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '30px 20px', color: '#94a3b8' }}>
+            <div style={{ textAlign: 'center', padding: '30px 20px', color: 'var(--text-muted)' }}>
               لا توجد جلسات قادمة حتّى الآن. قم بإضافة حجز جديد!
             </div>
           ) : (
@@ -608,22 +607,22 @@ export const DashboardView = () => {
                     justifyContent: 'space-between',
                     padding: '16px',
                     borderRadius: '14px',
-                    border: '1px solid rgba(139, 92, 246, 0.1)',
-                    backgroundColor: 'rgba(20, 27, 38, 0.75)',
-                    boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                    border: '1px solid var(--border-color)',
+                    backgroundColor: 'var(--bg-main)',
+                    boxShadow: 'none',
                     flexWrap: 'wrap',
                     gap: '12px'
                   }}
                 >
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: '#f1f5f9', margin: 0 }}>{b.title}</h4>
+                      <h4 style={{ fontSize: '0.92rem', fontWeight: 800, color: 'var(--text-main)', margin: 0 }}>{b.title}</h4>
                       <StatusBadge status={b.status} />
                     </div>
-                    <div style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '6px' }}>
-                      👤 العميل: <strong style={{ color: '#f1f5f9' }}>{b.clientName}</strong> | 📅 الموعد: <strong className="en-digits" style={{ color: '#fbbf24' }}>{b.date} ({b.startTime || ''})</strong>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '6px' }}>
+                      👤 العميل: <strong style={{ color: 'var(--text-main)' }}>{b.clientName}</strong> | 📅 الموعد: <strong className="en-digits" style={{ color: 'var(--status-warning)' }}>{b.date} ({b.startTime || ''})</strong>
                     </div>
-                    <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px' }}>
                       📍 الموقع: {b.location || 'غير محدد'}
                     </div>
                   </div>
@@ -643,7 +642,7 @@ export const DashboardView = () => {
                         setIsBookingDetailOpen(true);
                       }}
                       className="btn btn-secondary btn-sm" 
-                      style={{ fontSize: '0.76rem', borderRadius: '50px', padding: '6px 12px', minHeight: '34px', color: '#94a3b8' }}
+                      style={{ fontSize: '0.76rem', borderRadius: '50px', padding: '6px 12px', minHeight: '34px', color: 'var(--text-main)' }}
                     >
                       👁️ التفاصيل
                     </button>
@@ -653,7 +652,7 @@ export const DashboardView = () => {
                         setActiveTab('invoices');
                       }}
                       className="btn btn-primary btn-sm" 
-                      style={{ fontSize: '0.76rem', borderRadius: '50px', padding: '6px 12px', minHeight: '34px', backgroundColor: 'rgba(99, 102, 241, 0.15)', border: '1px solid rgba(99, 102, 241, 0.3)', color: '#818cf8', boxShadow: 'none' }}
+                      style={{ fontSize: '0.76rem', borderRadius: '50px', padding: '6px 12px', minHeight: '34px', backgroundColor: 'var(--primary-light)', border: '1px solid var(--border-color)', color: 'var(--primary-color)', boxShadow: 'none' }}
                     >
                       🧾 الفاتورة
                     </button>

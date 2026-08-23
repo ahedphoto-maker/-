@@ -40,15 +40,15 @@ export const BottomNavbar = ({ onOpenMobileSidebar }) => {
         left: 0,
         right: 0,
         height: '64px',
-        backgroundColor: 'rgba(20, 27, 38, 0.9)',
+        backgroundColor: 'var(--bg-card)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        borderTop: '1px solid rgba(139, 92, 246, 0.2)',
+        borderTop: '1px solid var(--border-color)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-around',
         zIndex: 'var(--z-mobile-nav)',
-        boxShadow: '0 -8px 32px rgba(0, 0, 0, 0.4)',
+        boxShadow: 'var(--card-shadow)',
         paddingBottom: 'env(safe-area-inset-bottom, 0px)'
       }}
     >
@@ -68,7 +68,7 @@ export const BottomNavbar = ({ onOpenMobileSidebar }) => {
                 borderRadius: '50%',
                 backgroundColor: '#6366f1',
                 color: '#ffffff',
-                border: '4px solid #141b27',
+                border: '4px solid var(--bg-card)',
                 boxShadow: '0 4px 16px rgba(99, 102, 241, 0.5), 0 0 12px rgba(139, 92, 246, 0.3)',
                 cursor: 'pointer',
                 display: 'flex',
