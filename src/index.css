@@ -612,3 +612,18 @@ option {
   transition: transform 0.25s ease;
   background-color: var(--bg-card);
 }
+
+/* Permanently hide Netlify Drawer, feedback overlays, and indicators */
+iframe[src^="https://app.netlify.com"],
+#netlify-identity-widget,
+.netlify-identity-button,
+#netlify-comms-iframe,
+[data-netlify-drawer],
+[id^="netlify-"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+}
