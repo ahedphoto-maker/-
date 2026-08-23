@@ -58,8 +58,8 @@ const MainLayout = () => {
   const isAuthenticated = !!(currentUser && currentUser.id);
 
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', 'light');
-    localStorage.setItem('star_media_theme', 'light');
+    const savedTheme = localStorage.getItem('star_media_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
   }, []);
 
   useEffect(() => {

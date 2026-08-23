@@ -127,8 +127,8 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         aria-label="القائمة الجانبية للنظام"
         style={{
           width: 'var(--sidebar-width)',
-          backgroundColor: 'var(--bg-sidebar)',
-          color: 'var(--text-sidebar)',
+          backgroundColor: '#0f172a',
+          color: '#94a3b8',
           position: 'fixed',
           top: 0,
           right: 0,
@@ -139,8 +139,8 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
           flexDirection: 'column',
           transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
           transform: isMobile && !isMobileOpen ? 'translateX(100%)' : 'translateX(0)',
-          borderLeft: '1px solid var(--border-color)',
-          boxShadow: isMobileOpen ? '-8px 0 30px rgba(0,0,0,0.08)' : 'none',
+          borderLeft: '1px solid rgba(255, 255, 255, 0.08)',
+          boxShadow: isMobileOpen ? '-8px 0 30px rgba(0,0,0,0.3)' : 'none',
           overscrollBehavior: 'contain'
         }}
       >
@@ -151,7 +151,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            borderBottom: '1px solid var(--border-color)'
+            borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -172,10 +172,10 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
               <Icons.Camera size={20} />
             </div>
             <div>
-              <h1 style={{ fontSize: '1.05rem', fontWeight: 900, color: 'var(--text-main)', letterSpacing: '-0.2px', margin: 0 }}>
+              <h1 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.2px', margin: 0 }}>
                 العهد ستار 🌟
               </h1>
-              <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', margin: '1px 0 0 0' }}>
+              <p style={{ fontSize: '0.68rem', color: '#94a3b8', margin: '1px 0 0 0' }}>
                 عاهد العماري | منصة الحجوزات
               </p>
             </div>
@@ -189,7 +189,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
               padding: '6px',
               borderRadius: '8px',
               border: 'none',
-              color: 'var(--text-muted)',
+              color: '#94a3b8',
               backgroundColor: 'transparent',
               display: isMobile ? 'flex' : 'none',
               cursor: 'pointer'
@@ -213,7 +213,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         >
           {navigationGroups.map((grp, gIdx) => (
             <div key={gIdx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: 'var(--text-muted)', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              <div style={{ padding: '4px 10px', fontSize: '0.68rem', fontWeight: 800, color: 'rgba(255, 255, 255, 0.4)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 {grp.title}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -240,8 +240,8 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
                         padding: '8px 12px',
                         height: '38px',
                         borderRadius: '8px',
-                        color: isActive ? 'var(--text-sidebar-active)' : 'var(--text-sidebar)',
-                        backgroundColor: isActive ? 'var(--bg-sidebar-active)' : 'transparent',
+                        color: isActive ? '#ffffff' : '#94a3b8',
+                        backgroundColor: isActive ? 'rgba(99, 102, 241, 0.22)' : 'transparent',
                         border: 'none',
                         fontWeight: isActive ? 800 : 500,
                         fontSize: '0.84rem',
@@ -253,9 +253,9 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
                       }}
                     >
                       {isActive && (
-                        <span style={{ position: 'absolute', right: 0, top: '6px', bottom: '6px', width: '4px', borderRadius: '4px', backgroundColor: 'var(--text-sidebar-active)' }} />
+                        <span style={{ position: 'absolute', right: 0, top: '6px', bottom: '6px', width: '4px', borderRadius: '4px', backgroundColor: '#6366f1' }} />
                       )}
-                      <span style={{ color: isActive ? 'var(--text-sidebar-active)' : 'var(--text-sidebar)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', flexShrink: 0 }}>
+                      <span style={{ color: isActive ? '#6366f1' : '#94a3b8', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '20px', flexShrink: 0 }}>
                         {getMenuIcon(item.id)}
                       </span>
                       <span style={{ flex: 1, whiteSpace: 'normal', wordBreak: 'break-word', textAlign: 'right', lineHeight: 1.35 }}>
@@ -273,12 +273,12 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         <div
           style={{
             padding: '12px 16px',
-            borderTop: '1px solid var(--border-color)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             gap: '10px',
-            backgroundColor: 'var(--bg-main)'
+            backgroundColor: 'rgba(15, 23, 42, 0.6)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: 1, minWidth: 0 }}>
@@ -295,10 +295,10 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
               }}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <p style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--text-main)', whiteSpace: 'normal', wordBreak: 'break-word', margin: 0, lineHeight: 1.3 }}>
+              <p style={{ fontSize: '0.82rem', fontWeight: 800, color: '#ffffff', whiteSpace: 'normal', wordBreak: 'break-word', margin: 0, lineHeight: 1.3 }}>
                 {currentUser?.name || 'عاهد العماري'}
               </p>
-              <p style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'normal', wordBreak: 'break-word', margin: '1px 0 0 0' }}>
+              <p style={{ fontSize: '0.7rem', color: '#94a3b8', whiteSpace: 'normal', wordBreak: 'break-word', margin: '1px 0 0 0' }}>
                 {(userRole === 'employee' || userRole === 'photographer') ? 'مصور ميداني' : 'مشرف النظام'}
               </p>
             </div>
@@ -312,9 +312,9 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
               navigateTo('/login');
             }}
             style={{
-              backgroundColor: 'rgba(239, 68, 68, 0.1)',
-              border: '1px solid rgba(239, 68, 68, 0.2)',
-              color: 'var(--status-danger)',
+              backgroundColor: 'rgba(239, 68, 68, 0.15)',
+              border: '1px solid rgba(239, 68, 68, 0.3)',
+              color: '#fca5a5',
               padding: '6px',
               borderRadius: '8px',
               cursor: 'pointer',
