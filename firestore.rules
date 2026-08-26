@@ -2,33 +2,54 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    match /bookings/{bookingId} {
-      allow get: if request.auth != null && (
-        request.auth.uid == resource.data.userId ||
-        request.auth.uid == resource.data.ownerId ||
-        request.auth.uid == resource.data.creatorId ||
-        request.auth.uid == resource.data.uid ||
-        resource.data.role == 'admin' ||
+
+    // Helper: Check if user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Helper: Check if user is authenticated with a real email (logged-in team member)
+    function isTeamMember() {
+      return isAuthenticated() && request.auth.token.email != null;
+    }
+
+    // Helper: Check if user is Admin / Supervisor
+    function isAdmin() {
+      return isAuthenticated() && (
         request.auth.token.role == 'admin' ||
-        request.auth.token.isSupervisor == true
-      );
-      
-      allow list: if request.auth != null;
-      
-      allow write: if request.auth != null && (
-        resource == null ||
-        request.auth.uid == resource.data.userId ||
-        request.auth.uid == resource.data.ownerId ||
-        request.auth.uid == resource.data.creatorId ||
-        request.auth.uid == resource.data.uid ||
-        request.auth.token.role == 'admin' ||
-        request.auth.token.isSupervisor == true
+        request.auth.token.isSupervisor == true ||
+        (request.auth.token.keys().hasAll(['email']) && request.auth.token.email in ['ahdalamary@gmail.com', 'ahed@lensflow.sa', 'admin@lensflow.sa'])
       );
     }
 
+    // Rules for Bookings collection
+    match /bookings/{bookingId} {
+      // Allow single booking read for any authenticated user (supporting client portal)
+      allow get: if isAuthenticated();
+      // Allow query/list and write operations only for logged-in team members
+      allow list, write: if isTeamMember();
+    }
+
+    // Rules for Team collection
+    match /team/{memberId} {
+      allow read: if isAuthenticated(); // Allow reading team list for the login selector
+      allow write: if isTeamMember();
+    }
+
+    // Rules for Devices collection
+    match /devices/{deviceId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Rules for Settings collection
+    match /settings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Default fallback rule for all other collections
     match /{document=**} {
-      allow read, write: if request.auth != null;
+      allow read, write: if isTeamMember();
     }
   }
 }

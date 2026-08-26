@@ -1,6 +1,7 @@
 import React, { memo } from 'react';
 import { StatusBadge } from '../../Common/StatusBadge';
 import * as Icons from 'lucide-react';
+import { formatTime12h } from '../../../utils/helpers';
 
 export const TodayBookings = memo(({ todayBookings, onSelectBooking }) => {
   return (
@@ -40,7 +41,7 @@ export const TodayBookings = memo(({ todayBookings, onSelectBooking }) => {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
               <StatusBadge status={b.status} />
               <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary-color)' }}>
-                ⏰ {b.startTime} - {b.endTime}
+                ⏰ {b.isAllDay ? 'طوال اليوم' : (b.startTime === 'صباحًا' || b.startTime === 'مساءً' ? b.startTime : `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`)}{b.attendanceTime && ` (حضور: ${b.attendanceTime})`}
               </span>
             </div>
           </div>

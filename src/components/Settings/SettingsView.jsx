@@ -1,6 +1,45 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
+import { registerDeviceToken, sendTestNotification } from '../../utils/fcm';
+
+// HTML5 Canvas client-side image compression helper
+const compressImage = (file, maxDimension = 600, quality = 0.7) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxDimension) {
+            height = Math.round((height * maxDimension) / width);
+            width = maxDimension;
+          }
+        } else {
+          if (height > maxDimension) {
+            width = Math.round((width * maxDimension) / height);
+            height = maxDimension;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = (err) => reject(err);
+      img.src = event.target.result;
+    };
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+};
 
 export const SettingsView = () => {
   const {
@@ -10,11 +49,37 @@ export const SettingsView = () => {
     updateUserProfile,
     team,
     updateTeamMember,
+    userRole
   } = useApp();
 
   const [activeTab, setActiveTab] = useState('general'); // 'general' | 'notifications' | 'passwords' | 'appearance' | 'menu' | 'permissions' | 'whatsapp' | 'gamification'
   const [visiblePasses, setVisiblePasses] = useState({});
   const [cloudApiUrl, setCloudApiUrl] = useState('https://api.star-media.sa/v1');
+  const [pushStatus, setPushStatus] = useState('default');
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [prefs, setPrefs] = useState(() => {
+    try {
+      const saved = localStorage.getItem('star_media_notification_prefs');
+      return saved ? JSON.parse(saved) : { bookings: true, clients: true, updates: true, team: true };
+    } catch (e) {
+      return { bookings: true, clients: true, updates: true, team: true };
+    }
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPushStatus(Notification.permission);
+    }
+  }, []);
+
+  const togglePref = (key) => {
+    setPrefs(prev => {
+      const updated = { ...prev, [key]: !prev[key] };
+      localStorage.setItem('star_media_notification_prefs', JSON.stringify(updated));
+      return updated;
+    });
+  };
 
   const togglePass = (id) => {
     setVisiblePasses(prev => ({ ...prev, [id]: !prev[id] }));
@@ -65,6 +130,112 @@ export const SettingsView = () => {
   }, [currentUser]);
 
   const [isSaving, setIsSaving] = useState(false);
+
+  // Initialize and sync company identity form state
+  const [identityForm, setIdentityForm] = useState({
+    name: settings?.companyIdentity?.name || 'استوديو العهد ستار للإنتاج الإعلامي',
+    logo: settings?.companyIdentity?.logo || '',
+    profilePic: settings?.companyIdentity?.profilePic || '',
+    coverPic: settings?.companyIdentity?.coverPic || '',
+    profileBg: settings?.companyIdentity?.profileBg || '',
+    primaryColor: settings?.companyIdentity?.primaryColor || settings?.appearance?.primaryColor || '#6366f1',
+    buttonColor: settings?.companyIdentity?.buttonColor || settings?.appearance?.primaryHover || '#4f46e5',
+    description: settings?.companyIdentity?.description || 'نقدم خدمات التصوير الاحترافي والتغطيات المباشرة بأعلى جودة.'
+  });
+
+  useEffect(() => {
+    if (settings) {
+      setIdentityForm({
+        name: settings.companyIdentity?.name || 'استوديو العهد ستار للإنتاج الإعلامي',
+        logo: settings.companyIdentity?.logo || '',
+        profilePic: settings.companyIdentity?.profilePic || '',
+        coverPic: settings.companyIdentity?.coverPic || '',
+        profileBg: settings.companyIdentity?.profileBg || '',
+        primaryColor: settings.companyIdentity?.primaryColor || settings.appearance?.primaryColor || '#6366f1',
+        buttonColor: settings.companyIdentity?.buttonColor || settings.appearance?.primaryHover || '#4f46e5',
+        description: settings.companyIdentity?.description || 'نقدم خدمات التصوير الاحترافي والتغطيات المباشرة بأعلى جودة.'
+      });
+    }
+  }, [settings]);
+
+  const isSuper = userRole === 'admin' || currentUser?.isSupervisor || currentUser?.role?.includes('مشرف') || currentUser?.role?.includes('مدير') || currentUser?.id === 1;
+
+  const handleImageUpload = async (e, key) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    try {
+      const compressedBase64 = await compressImage(file, 600, 0.7);
+      setIdentityForm(prev => ({
+        ...prev,
+        [key]: compressedBase64
+      }));
+    } catch (err) {
+      console.error('Image compression failed:', err);
+      alert('⚠️ فشل في ضغط وتحميل الصورة. يرجى تجربة ملف آخر.');
+    }
+  };
+
+  const handleDeleteImage = (key) => {
+    setIdentityForm(prev => ({
+      ...prev,
+      [key]: ''
+    }));
+  };
+
+  const handleSaveIdentity = (e) => {
+    e.preventDefault();
+    if (isSaving) return;
+    setIsSaving(true);
+    
+    if (!isSuper) {
+      alert('⚠️ عذراً، لا تمتلك الصلاحيات الكافية لتعديل هوية ومظهر الشركة.');
+      setIsSaving(false);
+      return;
+    }
+
+    if (updateSettings) {
+      updateSettings({
+        ...settings,
+        companyIdentity: identityForm,
+        appearance: {
+          ...settings.appearance,
+          primaryColor: identityForm.primaryColor,
+          primaryHover: identityForm.buttonColor
+        }
+      });
+    }
+    alert('✅ تم حفظ وتحديث هوية الشركة والمظهر البصري لجميع الأجهزة النشطة بنجاح! 🎨✨');
+    setIsSaving(false);
+  };
+
+  const resetIdentityToDefaults = () => {
+    if (window.confirm('هل أنت متأكد من رغبتك في استعادة الهوية والألوان الافتراضية للمنظومة؟')) {
+      const defaults = {
+        name: 'استوديو العهد ستار للإنتاج الإعلامي',
+        logo: '',
+        profilePic: '',
+        coverPic: '',
+        profileBg: '',
+        primaryColor: '#6366f1',
+        buttonColor: '#4f46e5',
+        description: 'نقدم خدمات التصوير الاحترافي والتغطيات المباشرة بأعلى جودة.'
+      };
+      setIdentityForm(defaults);
+      if (updateSettings) {
+        updateSettings({
+          ...settings,
+          companyIdentity: defaults,
+          appearance: {
+            ...settings.appearance,
+            primaryColor: '#6366f1',
+            primaryHover: '#4f46e5'
+          }
+        });
+      }
+      alert('🔄 تم استعادة الإعدادات والمظهر الافتراضي بنجاح.');
+    }
+  };
 
   const handleSaveGeneral = (e) => {
     e.preventDefault();
@@ -138,7 +309,7 @@ export const SettingsView = () => {
           { id: 'general', label: 'الإعدادات العامة', icon: Icons.Globe },
           { id: 'notifications', label: '🔔 إعدادات الإشعارات', icon: Icons.Bell },
           { id: 'passwords', label: '🔑 كلمات مرور الفريق', icon: Icons.Key },
-          { id: 'appearance', label: 'تخصيص المظهر (Theme)', icon: Icons.Palette },
+          { id: 'appearance', label: 'هوية الشركة وتخصيص المظهر', icon: Icons.Palette },
           { id: 'menu', label: 'ترتيب القائمة (Menu)', icon: Icons.ListOrdered },
           { id: 'permissions', label: 'الصلاحيات (Permissions)', icon: Icons.ShieldCheck },
           { id: 'whatsapp', label: 'ربط WhatsApp التنبيهات', icon: Icons.MessageSquare },
@@ -280,30 +451,140 @@ export const SettingsView = () => {
 
       {/* Tab 2: Notifications Settings */}
       {activeTab === 'notifications' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <div className="card" style={{ borderRight: '5px solid var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+          {/* Card 1: Device Notification Status */}
+          <div className="card" style={{ borderRight: '5px solid var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px', padding: '20px' }}>
             <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: 900, margin: 0 }}>📱 إشعارات النظام وتنبيهات المتصفح</h3>
-              <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', marginTop: '4px' }}>تفعيل إشعارات المتصفح المنبثقة للأحداث التشغيلية المهمة.</p>
+              <h3 style={{ fontSize: '1.1rem', fontWeight: 900, color: 'var(--text-main)', margin: 0 }}>📱 إشعارات النظام وأجهزة الجوال (Push Notifications)</h3>
+              <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginTop: '6px' }}>تلقي التنبيهات والأحداث على شاشة قفل جهازك مباشرة حتى عند إغلاق التطبيق أو المتصفح.</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px' }}>
+                <span style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--text-main)' }}>حالة هذا الجهاز:</span>
+                {pushStatus === 'granted' ? (
+                  <span className="badge badge-success" style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icons.CheckCircle size={12} /> مفعّلة ومصرح بها
+                  </span>
+                ) : pushStatus === 'denied' ? (
+                  <span className="badge badge-danger" style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icons.XCircle size={12} /> مرفوضة بالمتصفح
+                  </span>
+                ) : (
+                  <span className="badge badge-warning" style={{ fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    <Icons.AlertCircle size={12} /> بانتظار الترخيص
+                  </span>
+                )}
+              </div>
             </div>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={async () => {
-                if ('Notification' in window) {
-                  const permission = await Notification.requestPermission();
-                  if (permission === 'granted') {
-                    alert('🟢 تم تفعيل إشعارات المتصفح للجهاز بنجاح!');
-                  } else {
-                    alert('⚠️ صلاحية الإشعارات مرفوضة. يرجى تفعيلها من إعدادات المتصفح.');
+            
+            {pushStatus !== 'granted' && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={isSubscribing}
+                onClick={async () => {
+                  setIsSubscribing(true);
+                  try {
+                    if ('Notification' in window) {
+                      const permission = await Notification.requestPermission();
+                      setPushStatus(permission);
+                      if (permission === 'granted') {
+                        await registerDeviceToken(currentUser);
+                        alert('✅ تم تفعيل إشعارات المتصفح وتسجيل جهازك بنجاح!');
+                      } else {
+                        alert('⚠️ صلاحية الإشعارات مرفوضة. يرجى تفعيلها يدوياً من إعدادات المتصفح.');
+                      }
+                    } else {
+                      alert('⚠️ هذا المتصفح لا يدعم إشعارات النظام.');
+                    }
+                  } catch (err) {
+                    console.error(err);
+                  } finally {
+                    setIsSubscribing(false);
                   }
-                } else {
-                  alert('⚠️ المتصفح لا يدعم الإشعارات المنبثقة.');
-                }
-              }}
-            >
-              <span>تفعيل تنبيهات المتصفح 🔔</span>
-            </button>
+                }}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
+              >
+                <Icons.BellRing size={16} />
+                <span>{isSubscribing ? 'جاري تفعيل الإشعار...' : 'تفعيل الإشعارات الآن 🔔'}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Card 2: Notification Preferences Categories */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary-color)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icons.Sliders size={20} />
+              <span>⚙️ تخصيص المواضيع والعمليات المفضلة</span>
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>اختر أنواع الإشعارات التي ترغب باستقبالها على هذا الجهاز:</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px', marginTop: '10px' }}>
+              {[
+                { key: 'bookings', label: '📅 إشعارات الحجوزات الجديدة', desc: 'تنبيه عند إضافة حجز جديد للفريق أو المشرف.' },
+                { key: 'clients', label: '👤 إشعارات العملاء الجدد', desc: 'تنبيه عند تسجيل عميل جديد في النظام.' },
+                { key: 'updates', label: '🔄 إشعارات تعديل الحجوزات', desc: 'تنبيه فوري لأي تغيير في تاريخ أو حالة الحجز.' },
+                { key: 'team', label: '👥 إشعارات الفريق والمهام', desc: 'تنبيه للتكليفات والمهام الجديدة المسندة إليك.' }
+              ].map(item => (
+                <label key={item.key} style={{ display: 'flex', gap: '12px', padding: '16px', border: '1px solid var(--border-color)', borderRadius: '12px', backgroundColor: 'var(--bg-main)', cursor: 'pointer', margin: 0, transition: 'border-color 0.15s ease' }}>
+                  <input
+                    type="checkbox"
+                    checked={prefs[item.key]}
+                    onChange={() => togglePref(item.key)}
+                    style={{ width: '18px', height: '18px', marginTop: '3px', accentColor: 'var(--primary-color)' }}
+                  />
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: '0.88rem', color: 'var(--text-main)' }}>{item.label}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '4px', lineHeight: 1.4 }}>{item.desc}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Card 3: Test Notification Dispatcher */}
+          <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '14px', padding: '20px' }}>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--primary-color)', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icons.Flame size={20} />
+              <span>🧪 فحص واختبار الإشعارات</span>
+            </h3>
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: 0 }}>يمكنك فحص سلامة الاتصال باستقبال إشعار Push حقيقي فوري على هذا الجهاز حتى عند إغلاق التطبيق.</p>
+            <div>
+              <button
+                type="button"
+                disabled={isTesting}
+                onClick={async () => {
+                  setIsTesting(true);
+                  const token = localStorage.getItem('star_media_fcm_token');
+                  if (!token) {
+                    alert('⚠️ لم يتم العثور على رمز الإشعارات (FCM Token). يرجى التأكد من الضغط على زر تفعيل الإشعارات أولاً.');
+                    setIsTesting(false);
+                    return;
+                  }
+                  const success = await sendTestNotification(token);
+                  if (success) {
+                    alert('🚀 تم إرسال إشعار تجريبي بنجاح! راقب شاشة جهازك.');
+                  } else {
+                    alert('❌ فشل إرسال الإشعار. يرجى التحقق من أذونات المتصفح.');
+                  }
+                  setIsTesting(false);
+                }}
+                className="btn"
+                style={{
+                  backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                  border: '1px solid rgba(16, 185, 129, 0.2)',
+                  color: '#10b981',
+                  padding: '12px 24px',
+                  borderRadius: '10px',
+                  fontWeight: 'bold',
+                  fontSize: '0.88rem',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}
+              >
+                <Icons.Send size={16} />
+                <span>{isTesting ? 'جاري الإرسال الفوري...' : 'إرسال إشعار تجريبي للجهاز 🚀'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -333,58 +614,203 @@ export const SettingsView = () => {
         </div>
       )}
 
-      {/* Tab 4: Appearance Editor */}
+      {/* Tab 4: Appearance & Company Identity Editor */}
       {activeTab === 'appearance' && (
-        <form onSubmit={handleSaveAppearance} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>🎨 تخصيص الهوية والسمات الفورية (Live Theme Editor)</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-            <div style={{ padding: '16px', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
-              <label className="form-label">اللون الأساسي (Primary Color)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-                <input
-                  type="color"
-                  value={appearanceForm.primaryColor}
-                  onChange={e => setAppearanceForm({ ...appearanceForm, primaryColor: e.target.value })}
-                  style={{ width: '45px', height: '45px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
-                />
+        <form onSubmit={handleSaveIdentity} className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          <h3 style={{ fontSize: '1.05rem', fontWeight: 800, margin: 0 }}>🎨 هوية الشركة وتخصيص المظهر (Live Theme Editor)</h3>
+          
+          {!isSuper && (
+            <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'rgba(239, 68, 68, 0.08)', border: '1px solid rgba(239, 68, 68, 0.15)', color: 'var(--status-danger)', fontSize: '0.8rem', fontWeight: 800, display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Icons.ShieldAlert size={16} />
+              <span>وضع القراءة فقط: لا تمتلك الصلاحيات لتعديل هوية الشركة. الميزة متاحة للمشرفين والمديرين فقط.</span>
+            </div>
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+            {/* Right column: Texts */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              <div>
+                <label className="form-label">اسم الشركة</label>
                 <input
                   type="text"
                   className="form-control"
-                  value={appearanceForm.primaryColor}
-                  onChange={e => setAppearanceForm({ ...appearanceForm, primaryColor: e.target.value })}
+                  value={identityForm.name}
+                  disabled={!isSuper}
+                  onChange={e => setIdentityForm({ ...identityForm, name: e.target.value })}
+                  required
                 />
+              </div>
+
+              <div>
+                <label className="form-label">وصف الشركة</label>
+                <textarea
+                  className="form-control"
+                  rows={3}
+                  value={identityForm.description}
+                  disabled={!isSuper}
+                  onChange={e => setIdentityForm({ ...identityForm, description: e.target.value })}
+                  placeholder="اكتب وصفاً مختصراً للشركة..."
+                />
+              </div>
+
+              {/* Color selectors */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+                <div style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>اللون الرئيسي</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                    <input
+                      type="color"
+                      value={identityForm.primaryColor}
+                      disabled={!isSuper}
+                      onChange={e => setIdentityForm({ ...identityForm, primaryColor: e.target.value })}
+                      style={{ width: '36px', height: '36px', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: 0 }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={identityForm.primaryColor}
+                      disabled={!isSuper}
+                      onChange={e => setIdentityForm({ ...identityForm, primaryColor: e.target.value })}
+                      style={{ fontSize: '0.75rem', padding: '4px 6px' }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ padding: '12px', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
+                  <label className="form-label" style={{ fontSize: '0.78rem' }}>لون الأزرار والعناصر</label>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                    <input
+                      type="color"
+                      value={identityForm.buttonColor}
+                      disabled={!isSuper}
+                      onChange={e => setIdentityForm({ ...identityForm, buttonColor: e.target.value })}
+                      style={{ width: '36px', height: '36px', border: 'none', borderRadius: '6px', cursor: 'pointer', padding: 0 }}
+                    />
+                    <input
+                      type="text"
+                      className="form-control"
+                      value={identityForm.buttonColor}
+                      disabled={!isSuper}
+                      onChange={e => setIdentityForm({ ...identityForm, buttonColor: e.target.value })}
+                      style={{ fontSize: '0.75rem', padding: '4px 6px' }}
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
-            <div style={{ padding: '16px', border: '1px solid var(--border-color)', borderRadius: '10px' }}>
-              <label className="form-label">لون القائمة الجانبية (Sidebar BG)</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '8px' }}>
-                <input
-                  type="color"
-                  value={appearanceForm.bgSidebar}
-                  onChange={e => setAppearanceForm({ ...appearanceForm, bgSidebar: e.target.value })}
-                  style={{ width: '45px', height: '45px', border: 'none', borderRadius: '8px', cursor: 'pointer' }}
-                />
-                <input
-                  type="text"
-                  className="form-control"
-                  value={appearanceForm.bgSidebar}
-                  onChange={e => setAppearanceForm({ ...appearanceForm, bgSidebar: e.target.value })}
-                />
+            {/* Left column: Images Upload */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* 1. Logo Upload */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>شعار الشركة / Logo</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {identityForm.logo ? (
+                    <img src={identityForm.logo} alt="Logo" style={{ width: '56px', height: '56px', borderRadius: '10px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                  ) : (
+                    <div style={{ width: '56px', height: '56px', borderRadius: '10px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '1.2rem' }}>🎬</div>
+                  )}
+                  {isSuper && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Icons.Upload size={12} />
+                        <span>رفع</span>
+                        <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'logo')} style={{ display: 'none' }} />
+                      </label>
+                      {identityForm.logo && (
+                        <button type="button" onClick={() => handleDeleteImage('logo')} className="btn btn-sm" style={{ padding: '4px 10px', fontSize: '0.72rem', backgroundColor: 'rgba(239,68,68,0.08)', color: 'var(--status-danger)', border: '1px solid rgba(239,68,68,0.15)' }}>حذف</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Profile Pic Upload */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>صورة البروفايل</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {identityForm.profilePic ? (
+                    <img src={identityForm.profilePic} alt="Profile" style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                  ) : (
+                    <div style={{ width: '56px', height: '56px', borderRadius: '50%', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '1.2rem' }}>👤</div>
+                  )}
+                  {isSuper && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Icons.Upload size={12} />
+                        <span>رفع</span>
+                        <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'profilePic')} style={{ display: 'none' }} />
+                      </label>
+                      {identityForm.profilePic && (
+                        <button type="button" onClick={() => handleDeleteImage('profilePic')} className="btn btn-sm" style={{ padding: '4px 10px', fontSize: '0.72rem', backgroundColor: 'rgba(239,68,68,0.08)', color: 'var(--status-danger)', border: '1px solid rgba(239,68,68,0.15)' }}>حذف</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. Cover Pic Upload */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>صورة الغلاف / Cover</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {identityForm.coverPic ? (
+                    <img src={identityForm.coverPic} alt="Cover" style={{ width: '90px', height: '50px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                  ) : (
+                    <div style={{ width: '90px', height: '50px', borderRadius: '8px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>🖼️ غلاف</div>
+                  )}
+                  {isSuper && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Icons.Upload size={12} />
+                        <span>رفع</span>
+                        <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'coverPic')} style={{ display: 'none' }} />
+                      </label>
+                      {identityForm.coverPic && (
+                        <button type="button" onClick={() => handleDeleteImage('coverPic')} className="btn btn-sm" style={{ padding: '4px 10px', fontSize: '0.72rem', backgroundColor: 'rgba(239,68,68,0.08)', color: 'var(--status-danger)', border: '1px solid rgba(239,68,68,0.15)' }}>حذف</button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 4. Profile Background Upload */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>خلفية البروفايل</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {identityForm.profileBg ? (
+                    <img src={identityForm.profileBg} alt="Background" style={{ width: '90px', height: '50px', borderRadius: '8px', objectFit: 'cover', border: '1px solid var(--border-color)' }} />
+                  ) : (
+                    <div style={{ width: '90px', height: '50px', borderRadius: '8px', backgroundColor: 'var(--bg-main)', border: '1px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '0.9rem' }}>🎨 خلفية</div>
+                  )}
+                  {isSuper && (
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <label className="btn btn-secondary btn-sm" style={{ cursor: 'pointer', margin: 0, padding: '4px 10px', fontSize: '0.72rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <Icons.Upload size={12} />
+                        <span>رفع</span>
+                        <input type="file" accept="image/*" onChange={e => handleImageUpload(e, 'profileBg')} style={{ display: 'none' }} />
+                      </label>
+                      {identityForm.profileBg && (
+                        <button type="button" onClick={() => handleDeleteImage('profileBg')} className="btn btn-sm" style={{ padding: '4px 10px', fontSize: '0.72rem', backgroundColor: 'rgba(239,68,68,0.08)', color: 'var(--status-danger)', border: '1px solid rgba(239,68,68,0.15)' }}>حذف</button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-            <button type="submit" className="btn btn-primary">
-              <Icons.Sparkles size={16} />
-              <span>تطبيق المظهر 🎨</span>
-            </button>
-            <button type="button" onClick={resetThemeToDefaults} className="btn btn-secondary">
-              <Icons.RotateCcw size={16} />
-              <span>إعادة الضبط الافتراضي 🔄</span>
-            </button>
-          </div>
+          {isSuper && (
+            <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '10px' }}>
+              <button type="submit" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icons.Save size={16} />
+                <span>حفظ التعديلات وتطبيق الهوية 🎨</span>
+              </button>
+              <button type="button" onClick={resetIdentityToDefaults} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icons.RotateCcw size={16} />
+                <span>استعادة الافتراضيات 🔄</span>
+              </button>
+            </div>
+          )}
         </form>
       )}
 

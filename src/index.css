@@ -633,3 +633,45 @@ iframe[src^="https://app.netlify.com"],
   width: 0 !important;
   height: 0 !important;
 }
+
+/* Universal SVG & Lucide Icons Display Standards for Crisp Light Theme */
+svg.lucide, svg {
+  display: inline-block;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+svg.lucide path, 
+svg.lucide circle, 
+svg.lucide line, 
+svg.lucide rect, 
+svg.lucide polyline, 
+svg.lucide polygon {
+  vector-effect: non-scaling-stroke;
+}
+
+/* Animations for Mobile Experience */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.animate-spin {
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-drawer {
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+

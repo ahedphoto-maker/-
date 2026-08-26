@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import * as Icons from 'lucide-react';
-import { formatBookingNumber } from '../../utils/helpers';
+import { formatBookingNumber, formatTime12h } from '../../utils/helpers';
 
 // Default Riyadh Coordinates for initial bookings
 const defaultCoordinates = {
@@ -577,7 +577,7 @@ export const BookingsMap = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <Icons.Clock size={14} color="#f59e0b" />
-                    <span><strong>التوقيت:</strong> {selectedPin.b.startTime} - {selectedPin.b.endTime}</span>
+                    <span><strong>التوقيت:</strong> {selectedPin.b.isAllDay ? 'طوال اليوم' : (selectedPin.b.startTime === 'صباحًا' || selectedPin.b.startTime === 'مساءً' ? selectedPin.b.startTime : `${formatTime12h(selectedPin.b.startTime)} - ${formatTime12h(selectedPin.b.endTime)}`)}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <Icons.Camera size={14} color="#8b5cf6" />
@@ -899,7 +899,7 @@ const SidebarContent = ({
                   <span>📍 {b.location.split(' - ')[0]}</span>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
                     <span className="en-digits">📅 {b.date || b.startDate}</span>
-                    <span className="en-digits">🕒 {b.startTime} - {b.endTime}</span>
+                    <span className="en-digits">🕒 {b.isAllDay ? 'طوال اليوم' : (b.startTime === 'صباحًا' || b.startTime === 'مساءً' ? b.startTime : `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`)}</span>
                   </div>
                 </div>
               </div>

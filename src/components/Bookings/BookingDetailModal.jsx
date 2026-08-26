@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../Common/StatusBadge';
-import { formatCurrency, formatBookingNumber } from '../../utils/helpers';
+import { formatCurrency, formatBookingNumber, formatTime12h } from '../../utils/helpers';
 import * as Icons from 'lucide-react';
 
 export const BookingDetailModal = () => {
@@ -61,7 +61,7 @@ export const BookingDetailModal = () => {
     const clientName = b.clientName || 'العميل';
     
     const bookingDateStr = b.date || b.startDate || '-';
-    const bookingTimeStr = b.isAllDay ? 'طوال اليوم' : (b.startTime || '16:00');
+    const bookingTimeStr = b.isAllDay ? 'طوال اليوم' : formatTime12h(b.startTime || '16:00');
     const locationStr = b.location || 'موقع التصوير';
 
     let base = '';
@@ -261,7 +261,8 @@ export const BookingDetailModal = () => {
               <p style={{ fontSize: '0.76rem', color: 'var(--text-muted)', margin: 0 }}>التاريخ والوقت</p>
               <p style={{ fontWeight: 800, marginTop: '6px', margin: '6px 0 0 0' }}>📅 {currentBooking.date || currentBooking.startDate}</p>
               <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', margin: '4px 0 0 0' }}>
-                🕐 {currentBooking.isAllDay ? 'طوال اليوم (مهمة ممتدة)' : `من ${currentBooking.startTime} إلى ${currentBooking.endTime}`}
+                🕐 {currentBooking.isAllDay ? 'طوال اليوم (مهمة ممتدة)' : `توقيت التغطية: ${currentBooking.startTime === 'صباحًا' || currentBooking.startTime === 'مساءً' ? currentBooking.startTime : formatTime12h(currentBooking.startTime)}`}
+                {currentBooking.attendanceTime && ` | وقت الحضور: ${currentBooking.attendanceTime}`}
               </p>
             </div>
 

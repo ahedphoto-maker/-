@@ -25,3 +25,10 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# Secrets and local scripts
+.env
+star-media-service-account.json
+tryEmailAuth.js
+checkDb.js
+check_firestore_admin.py

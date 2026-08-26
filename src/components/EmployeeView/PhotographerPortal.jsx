@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { EquipmentView } from '../Equipment/EquipmentView';
 import { navigateTo } from '../../routes/Router';
 import * as Icons from 'lucide-react';
+import { formatTime12h, parseTime12hTo24h, generateAttendanceTimeOptions } from '../../utils/helpers';
 
 export const PhotographerPortal = ({ activeSubTab }) => {
   const {
@@ -54,6 +55,9 @@ export const PhotographerPortal = ({ activeSubTab }) => {
     totalPrice: 1500,
     notes: ''
   });
+  const [bookingIsAllDay, setBookingIsAllDay] = useState(false);
+  const [bookingCoveragePeriod, setBookingCoveragePeriod] = useState('صباحًا');
+  const [bookingAttendanceTime, setBookingAttendanceTime] = useState('');
   const [damageReport, setDamageReport] = useState({ notes: '' });
 
   // Live Shooting Mode Timer
@@ -173,19 +177,23 @@ export const PhotographerPortal = ({ activeSubTab }) => {
     setClientForm({ name: '', phone: '', email: '', company: '', type: 'فرد', notes: '' });
     alert('🎉 تم إضافة العميل وتزامنه بنجاح!');
   };
-
   const handleAddBookingSubmit = (e) => {
     e.preventDefault();
     if (!bookingForm.clientName) {
       alert('الرجاء إدخال اسم العميل أو المشروع.');
       return;
     }
+    const selectedTime = bookingIsAllDay ? 'طوال اليوم' : bookingCoveragePeriod;
     addBooking && addBooking({
       clientName: bookingForm.clientName,
       title: `${bookingForm.type} — ${bookingForm.clientName}`,
       serviceType: bookingForm.type,
       date: bookingForm.date,
-      time: bookingForm.time,
+      startTime: selectedTime,
+      endTime: selectedTime,
+      time: selectedTime,
+      isAllDay: bookingIsAllDay,
+      attendanceTime: bookingAttendanceTime || '',
       location: bookingForm.location,
       totalPrice: Number(bookingForm.totalPrice) || 1500,
       notes: bookingForm.notes,
@@ -194,6 +202,9 @@ export const PhotographerPortal = ({ activeSubTab }) => {
     });
     setIsAddBookingOpen(false);
     setBookingForm({ clientName: '', type: 'تصوير مشروع', date: new Date().toISOString().split('T')[0], time: '16:00', location: 'الرياض', totalPrice: 1500, notes: '' });
+    setBookingIsAllDay(false);
+    setBookingCoveragePeriod('صباحًا');
+    setBookingAttendanceTime('');
     alert('📅 تم تسجيل الحجز وتزامنه فوراً مع السيرفر!');
   };
 
@@ -569,7 +580,7 @@ export const PhotographerPortal = ({ activeSubTab }) => {
                   </div>
 
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px', backgroundColor: 'var(--bg-card)', padding: '8px 10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                    <div>⏰ الموعد: <strong>{b.startTime || '16:00'} - {b.endTime || '20:00'}</strong></div>
+                    <div>⏰ الموعد: <strong>{b.isAllDay ? 'طوال اليوم' : (b.startTime === 'صباحًا' || b.startTime === 'مساءً' ? b.startTime : `${formatTime12h(b.startTime || '16:00')} - ${formatTime12h(b.endTime || '20:00')}`)}{b.attendanceTime && ` (حضور: ${b.attendanceTime})`}</strong></div>
                     <div>📍 الموقع: <strong>{b.location || 'الرياض'}</strong></div>
                   </div>
                 </div>
@@ -837,10 +848,80 @@ export const PhotographerPortal = ({ activeSubTab }) => {
                     <label className="form-label">التاريخ</label>
                     <input type="date" className="form-control" value={bookingForm.date} onChange={e => setBookingForm({ ...bookingForm, date: e.target.value })} />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label">التوقيت</label>
-                    <input type="time" className="form-control" value={bookingForm.time} onChange={e => setBookingForm({ ...bookingForm, time: e.target.value })} />
+                  <div className="form-group" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', paddingBottom: '10px' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.76rem', fontWeight: 800, color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={bookingIsAllDay}
+                        onChange={e => setBookingIsAllDay(e.target.checked)}
+                        style={{ width: '14px', height: '14px', accentColor: 'var(--primary-color)' }}
+                      />
+                      <span>طوال اليوم (مهمة ممتدة) 📅</span>
+                    </label>
                   </div>
+                </div>
+
+                {!bookingIsAllDay && (
+                  <div className="form-group" style={{ marginTop: '8px' }}>
+                    <label className="form-label">توقيت التغطية</label>
+                    <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+                      <button
+                        type="button"
+                        onClick={() => setBookingCoveragePeriod('صباحًا')}
+                        className={`btn ${bookingCoveragePeriod === 'صباحًا' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          borderRadius: '8px',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          fontSize: '0.8rem',
+                          border: '1px solid var(--border-color)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        ☀️ صباحًا
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookingCoveragePeriod('مساءً')}
+                        className={`btn ${bookingCoveragePeriod === 'مساءً' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          borderRadius: '8px',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          fontSize: '0.8rem',
+                          border: '1px solid var(--border-color)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        🌙 مساءً
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                <div className="form-group" style={{ marginTop: '8px' }}>
+                  <label className="form-label">وقت الحضور (اختياري)</label>
+                  <select
+                    value={bookingAttendanceTime}
+                    onChange={e => setBookingAttendanceTime(e.target.value)}
+                    className="form-control"
+                    style={{ height: '36px', borderRadius: '8px', fontSize: '0.8rem', padding: '0 8px' }}
+                  >
+                    <option value="">اختر وقت الحضور ⏰</option>
+                    {generateAttendanceTimeOptions().map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
                 </div>
               </div>
               <div className="modal-footer">

@@ -4,7 +4,7 @@ import { navigateTo } from '../../routes/Router';
 import * as Icons from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
-  const { activeTab, setActiveTab, userRole, currentUser, logoutUser, setActiveOverlay } = useApp();
+  const { activeTab, setActiveTab, userRole, currentUser, logoutUser, setActiveOverlay, settings } = useApp();
 
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= 992);
   useEffect(() => {
@@ -154,29 +154,45 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
             borderBottom: '1px solid rgba(255, 255, 255, 0.08)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div
-              style={{
-                width: '36px',
-                height: '36px',
-                borderRadius: '10px',
-                background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: '#ffffff',
-                boxShadow: '0 4px 12px rgba(6, 182, 212, 0.35)',
-                fontWeight: 900
-              }}
-            >
-              <Icons.Camera size={20} />
-            </div>
-            <div>
-              <h1 style={{ fontSize: '1.05rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.2px', margin: 0 }}>
-                العهد ستار 🌟
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', minWidth: 0, flex: 1 }}>
+            {settings?.companyIdentity?.logo ? (
+              <img
+                src={settings.companyIdentity.logo}
+                alt="Logo"
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  objectFit: 'cover',
+                  boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                  flexShrink: 0
+                }}
+              />
+            ) : (
+              <div
+                style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '10px',
+                  background: 'linear-gradient(135deg, #06b6d4 0%, #3b82f6 100%)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  boxShadow: '0 4px 12px rgba(6, 182, 212, 0.35)',
+                  fontWeight: 900,
+                  flexShrink: 0
+                }}
+              >
+                <Icons.Camera size={20} />
+              </div>
+            )}
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h1 style={{ fontSize: '1.02rem', fontWeight: 900, color: '#ffffff', letterSpacing: '-0.2px', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={settings?.companyIdentity?.name || 'العهد ستار 🌟'}>
+                {settings?.companyIdentity?.name || 'العهد ستار 🌟'}
               </h1>
-              <p style={{ fontSize: '0.68rem', color: '#94a3b8', margin: '1px 0 0 0' }}>
-                عاهد العماري | منصة الحجوزات
+              <p style={{ fontSize: '0.66rem', color: '#94a3b8', margin: '1px 0 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={settings?.companyIdentity?.description || 'عاهد العماري | منصة الحجوزات'}>
+                {settings?.companyIdentity?.description || 'عاهد العماري | منصة الحجوزات'}
               </p>
             </div>
           </div>

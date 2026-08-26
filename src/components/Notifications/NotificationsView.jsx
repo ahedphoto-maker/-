@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
+import { registerDeviceToken } from '../../utils/fcm';
 
 export const NotificationsView = () => {
   const { notifications, handleNotificationClick, markAllNotificationsAsRead, currentUser } = useApp();
@@ -31,6 +32,7 @@ export const NotificationsView = () => {
         const permission = await Notification.requestPermission();
         setPushStatus(permission);
         if (permission === 'granted') {
+          await registerDeviceToken(currentUser);
           alert('✅ تم تفعيل إشعارات المتصفح بنجاح على هذا الجهاز!');
         } else {
           alert('⚠️ تم رفض إذن الإشعارات من إعدادات المتصفح. يرجى تفعيلها يدوياً.');

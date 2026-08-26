@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../Common/StatusBadge';
-import { formatCurrency, formatBookingNumber } from '../../utils/helpers';
+import { formatCurrency, formatBookingNumber, formatTime12h, parseTime12hTo24h, parse24hToParts, formatDateTime12h, getPeriodFromTime, generateAttendanceTimeOptions } from '../../utils/helpers';
 import * as Icons from 'lucide-react';
 
 export const BookingsView = () => {
@@ -27,7 +27,8 @@ export const BookingsView = () => {
     removeFromWaitlist,
     quotations = [],
     addQuotation,
-    convertQuoteToBooking
+    convertQuoteToBooking,
+    isLoadingBookings
   } = useApp();
 
   const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'statements' | 'collaborations'
@@ -56,6 +57,9 @@ export const BookingsView = () => {
   const [drawerBooking, setDrawerBooking] = useState(null);
   const [isDrawerEditing, setIsDrawerEditing] = useState(false);
   const [drawerEditData, setDrawerEditData] = useState({});
+  const [editIsAllDay, setEditIsAllDay] = useState(false);
+  const [editCoveragePeriod, setEditCoveragePeriod] = useState('صباحًا');
+  const [editAttendanceTime, setEditAttendanceTime] = useState('');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const dropdownRef = useRef(null);
 
@@ -286,7 +290,10 @@ export const BookingsView = () => {
     const partnerName = b.bookingType === 'freelancer' ? (b.freelancerName || 'المصور') : (b.companyName || 'الشركة');
     const clientName = b.clientName || 'العميل';
     const bookingDateStr = b.date || b.startDate || '-';
-    const bookingTimeStr = b.isAllDay ? 'طوال اليوم' : (b.startTime || '16:00');
+    let bookingTimeStr = b.isAllDay ? 'طوال اليوم' : formatTime12h(b.startTime || '16:00');
+    if (b.attendanceTime) {
+      bookingTimeStr += ` (الحضور: ${b.attendanceTime})`;
+    }
     const locationStr = b.location || 'موقع التصوير';
 
     let base = '';
@@ -566,15 +573,26 @@ export const BookingsView = () => {
   };
 
   const handleStartDrawerEdit = () => {
-    setDrawerEditData({ ...drawerBooking });
+    const b = drawerBooking;
+    setDrawerEditData({ ...b });
+    setEditIsAllDay(b.isAllDay || false);
+    setEditCoveragePeriod(getPeriodFromTime(b.startTime));
+    setEditAttendanceTime(b.attendanceTime || '');
     setIsDrawerEditing(true);
   };
 
   const handleSaveDrawerEdit = () => {
+    const updated = {
+      ...drawerEditData,
+      isAllDay: editIsAllDay,
+      startTime: editIsAllDay ? 'طوال اليوم' : editCoveragePeriod,
+      endTime: editIsAllDay ? 'طوال اليوم' : editCoveragePeriod,
+      attendanceTime: editAttendanceTime || ''
+    };
     if (updateBooking) {
-      updateBooking(drawerBooking.id, drawerEditData);
+      updateBooking(drawerBooking.id, updated);
     }
-    setDrawerBooking({ ...drawerEditData });
+    setDrawerBooking({ ...updated });
     setIsDrawerEditing(false);
   };
 
@@ -730,7 +748,7 @@ export const BookingsView = () => {
           {/* 1. Revamped Filter Bar */}
           <div className="card" style={{ padding: isMobile ? '12px' : '20px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             
-            {isMobile && userRole === 'admin' && (
+            {isMobile && userRole && (
               <button
                 onClick={() => setIsBookingFormOpen && setIsBookingFormOpen(true)}
                 className="btn btn-primary"
@@ -826,7 +844,7 @@ export const BookingsView = () => {
                   </button>
                 </div>
 
-                {!isMobile && userRole === 'admin' && (
+                {!isMobile && userRole && (
                   <button
                     onClick={() => setIsBookingFormOpen && setIsBookingFormOpen(true)}
                     className="btn btn-primary"
@@ -905,6 +923,24 @@ export const BookingsView = () => {
             isMobile ? (
               /* Mobile card view (Requirement 13) */
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {isLoadingBookings && (
+                  <div style={{
+                    background: 'rgba(99, 102, 241, 0.08)',
+                    border: '1px dashed var(--primary-color)',
+                    color: 'var(--primary-color)',
+                    padding: '10px 14px',
+                    borderRadius: '12px',
+                    fontSize: '0.8rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    marginBottom: '4px'
+                  }}>
+                    <Icons.Loader size={15} className="animate-spin" style={{ color: 'var(--primary-color)' }} />
+                    <span style={{ fontWeight: 800 }}>جاري مزامنة وتحديث الحجوزات مع قاعدة البيانات...</span>
+                  </div>
+                )}
                 {filteredBookings.length === 0 ? (
                   <div className="card" style={{ textAlign: 'center', padding: '30px', color: 'var(--text-muted)' }}>لا توجد حجوزات تطابق المعايير</div>
                 ) : (
@@ -923,16 +959,32 @@ export const BookingsView = () => {
                           cursor: 'pointer',
                           display: 'flex',
                           flexDirection: 'column',
-                          gap: '8px',
+                          gap: '12px',
                           border: drawerBooking?.id === b.id ? '1px solid var(--primary-color)' : '1px solid var(--border-color)',
                           borderRight: `5px solid ${getStatusColor(b.status)}`,
                           backgroundColor: drawerBooking?.id === b.id ? 'rgba(99, 102, 241, 0.04)' : (dayLabel ? dayLabel.bg : 'var(--bg-card)'),
-                          boxShadow: '0 2px 5px rgba(0,0,0,0.02)',
-                          position: 'relative'
+                          boxShadow: '0 4px 12px -2px rgba(0,0,0,0.03)',
+                          position: 'relative',
+                          borderRadius: '12px',
+                          transition: 'all 0.2s ease'
                         }}
                       >
+                        {/* Top Header of the Card */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 700 }}>{formatBookingNumber(b.bookingNumber)}</span>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 800 }}>{formatBookingNumber(b.bookingNumber)}</span>
+                            <span style={{ 
+                              fontSize: '0.64rem', 
+                              padding: '2px 6px', 
+                              borderRadius: '4px', 
+                              backgroundColor: b.bookingType === 'freelancer' ? 'rgba(16, 185, 129, 0.1)' : (b.bookingType === 'company' ? 'rgba(245, 158, 11, 0.1)' : 'rgba(59, 130, 246, 0.1)'), 
+                              color: b.bookingType === 'freelancer' ? '#10b981' : (b.bookingType === 'company' ? '#f59e0b' : '#3b82f6'), 
+                              fontWeight: 900 
+                            }}>
+                              {b.bookingType === 'freelancer' ? '👤 مستقل' : (b.bookingType === 'company' ? '🏢 شركة' : (b.bookingType === 'partnership' ? '🤝 شراكة' : '👤 عميل فردي'))}
+                            </span>
+                          </div>
+                          
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                             {dayLabel && (
                               <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 900, backgroundColor: dayLabel.color, color: '#ffffff' }}>
@@ -945,117 +997,123 @@ export const BookingsView = () => {
                                 e.stopPropagation();
                                 setActiveMenuId(activeMenuId === b.id ? null : b.id);
                               }}
-                              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '2px' }}
+                              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
                             >
                               <Icons.MoreVertical size={16} />
                             </button>
                           </div>
                         </div>
 
-                        {/* Mobile Avatar + WhatsApp + Name Flow */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          {/* Avatar */}
-                          <span style={{ fontSize: '1.1rem', width: '28px', height: '28px', borderRadius: '50%', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        {/* Customer Details Row */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                          <span style={{ fontSize: '1.2rem', width: '32px', height: '32px', borderRadius: '50%', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                             {b.bookingType === 'freelancer' ? '👤' : (b.bookingType === 'company' || b.bookingType === 'partnership' ? '🏢' : '👤')}
                           </span>
-
-                          {/* Quick WhatsApp button container */}
-                          <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                            {phone ? (
-                              <button
-                                {...whatsappHandlers}
-                                style={{
-                                  width: '26px',
-                                  height: '26px',
-                                  borderRadius: '50%',
-                                  backgroundColor: '#25D366',
-                                  color: '#ffffff',
-                                  border: 'none',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  boxShadow: '0 2px 4px rgba(37, 211, 102, 0.3)',
-                                  cursor: 'pointer',
-                                  padding: 0
-                                }}
-                                title="إرسال واتساب سريع (اضغط مطولاً للخيارات)"
-                              >
-                                <Icons.MessageSquare size={13} fill="#ffffff" stroke="none" />
-                              </button>
-                            ) : (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDrawerBooking(b);
-                                  setIsDrawerEditing(true);
-                                }}
-                                style={{ fontSize: '0.64rem', color: 'var(--primary-color)', border: 'none', backgroundColor: 'transparent', cursor: 'pointer', padding: '2px 4px', fontWeight: 800 }}
-                              >
-                                + إضافة رقم
-                              </button>
-                            )}
-
-                            {/* Long Press Template dropdown */}
-                            {activeLongPressBookingId === b.id && (
-                              <div
-                                style={{
-                                  position: 'absolute',
-                                  top: '28px',
-                                  right: '0',
-                                  backgroundColor: 'var(--bg-card)',
-                                  border: '1px solid var(--border-color)',
-                                  borderRadius: '8px',
-                                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                                  zIndex: 200,
-                                  minWidth: '150px',
-                                  display: 'flex',
-                                  flexDirection: 'column',
-                                  padding: '4px 0'
-                                }}
-                                onClick={e => e.stopPropagation()}
-                              >
-                                <div style={{ padding: '6px 10px', fontSize: '0.68rem', color: 'var(--text-muted)', borderBottom: '1px solid var(--border-color)', fontWeight: 800 }}>اختر قالب الرسالة:</div>
-                                <button onClick={() => handleSendWhatsAppDirect(b, 'ready')} style={dropdownItemStyle}>✅ أنا جاهز</button>
-                                <button onClick={() => handleSendWhatsAppDirect(b, 'confirm')} style={dropdownItemStyle}>🤝 تأكيد الموعد</button>
-                                <button onClick={() => handleSendWhatsAppDirect(b, 'remind')} style={dropdownItemStyle}>🔔 تذكير بالموعد</button>
-                                <button onClick={() => handleSendWhatsAppDirect(b, 'quick')} style={dropdownItemStyle}>⚡ رسالة سريعة</button>
-                                <button
-                                  onClick={() => {
-                                    setActiveLongPressBookingId(null);
-                                    setDrawerBooking(b);
-                                    setActiveWhatsAppEntity(b.bookingType === 'freelancer' ? 'freelancer' : (b.bookingType === 'company' || b.bookingType === 'partnership' ? 'company' : 'client'));
-                                  }}
-                                  style={{ ...dropdownItemStyle, borderTop: '1px dashed var(--border-color)' }}
-                                >
-                                  ✏️ رسالة مخصصة...
-                                </button>
-                                <button onClick={() => setActiveLongPressBookingId(null)} style={{ ...dropdownItemStyle, color: '#ef4444' }}>إغلاق القائمة</button>
-                              </div>
+                          
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', flex: 1 }}>
+                            <h4 style={{ fontSize: '0.92rem', fontWeight: 900, margin: 0, color: 'var(--text-main)' }}>{getEntityName(b)}</h4>
+                            {phone && (
+                              <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontFamily: 'Inter, sans-serif' }}>{phone}</span>
                             )}
                           </div>
 
-                          <h4 style={{ fontSize: '0.88rem', fontWeight: 900, margin: 0, color: 'var(--text-main)', marginRight: '6px' }}>{getEntityName(b)}</h4>
+                          {/* Quick WhatsApp button */}
+                          {phone && (
+                            <button
+                              {...whatsappHandlers}
+                              style={{
+                                width: '32px',
+                                height: '32px',
+                                borderRadius: '50%',
+                                backgroundColor: '#25D366',
+                                color: '#ffffff',
+                                border: 'none',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                boxShadow: '0 2px 6px rgba(37, 211, 102, 0.3)',
+                                cursor: 'pointer',
+                                padding: 0
+                              }}
+                              title="واتساب سريع"
+                            >
+                              <Icons.MessageSquare size={16} color="#ffffff" />
+                            </button>
+                          )}
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                          <div>📅 التاريخ والوقت: <strong>{b.date} ({b.startTime || '16:00'})</strong></div>
-                          <div>📷 نوع التصوير: <strong>{b.title}</strong></div>
-                          <div>📍 الموقع: <strong>{b.location}</strong></div>
+                        {/* Event details block */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.8rem', color: 'var(--text-muted)', paddingRight: '4px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Icons.Calendar size={13} color="var(--text-muted)" />
+                            <span>📅 التاريخ والوقت: <strong>{b.date} ({formatTime12h(b.startTime || '16:00')}{b.attendanceTime && ` - الحضور: ${b.attendanceTime}`})</strong></span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Icons.Camera size={13} color="var(--text-muted)" />
+                            <span>📷 نوع التغطية: <strong>{b.title}</strong></span>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Icons.MapPin size={13} color="var(--text-muted)" />
+                            <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>📍 الموقع: <strong>{b.location}</strong></span>
+                          </div>
                         </div>
 
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '8px', marginTop: '4px' }}>
+                        {/* Financial Status Summary */}
+                        <div style={{ 
+                          display: 'flex', 
+                          justifyContent: 'space-between', 
+                          alignItems: 'center', 
+                          backgroundColor: 'var(--bg-main)', 
+                          padding: '8px 12px', 
+                          borderRadius: '8px', 
+                          fontSize: '0.78rem'
+                        }}>
+                          {b.totalPrice === null || b.totalPrice === undefined || b.financialStatus === 'no_price' ? (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontWeight: 900 }}>
+                              <Icons.AlertCircle size={14} color="#ef4444" style={{ animation: 'pulse 2s infinite' }} />
+                              <span>⚠️ السعر غير محدد</span>
+                            </div>
+                          ) : (
+                            <div style={{ display: 'flex', gap: '12px' }}>
+                              <div>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>السعر:</span>{' '}
+                                <strong style={{ fontFamily: 'Inter, sans-serif' }}>{formatCurrency(b.totalPrice)}</strong>
+                              </div>
+                              {b.remainingAmount > 0 && (
+                                <div>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>المتبقي:</span>{' '}
+                                  <strong style={{ color: '#ef4444', fontFamily: 'Inter, sans-serif' }}>{formatCurrency(b.remainingAmount)}</strong>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          <span style={{ 
+                            padding: '2px 8px', 
+                            borderRadius: '4px', 
+                            fontSize: '0.68rem', 
+                            fontWeight: 900, 
+                            backgroundColor: b.paymentStatus === 'مدفوع' ? 'rgba(16, 185, 129, 0.12)' : (b.paymentStatus === 'جزئي' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
+                            color: b.paymentStatus === 'مدفوع' ? '#10b981' : (b.paymentStatus === 'جزئي' ? '#f59e0b' : '#ef4444')
+                          }}>
+                            {b.paymentStatus || 'غير مدفوع'}
+                          </span>
+                        </div>
+
+                        {/* Card Footer Actions */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '2px' }}>
                           <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>{getLastActionText(b)}</span>
                           <div style={{ display: 'flex', gap: '8px' }}>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setDrawerBooking(b);
-                                setActiveWhatsAppEntity('client');
+                                setActiveWhatsAppEntity(b.bookingType === 'freelancer' ? 'freelancer' : (b.bookingType === 'company' || b.bookingType === 'partnership' ? 'company' : 'client'));
                               }}
                               className="btn btn-secondary btn-sm"
-                              style={{ padding: '4px 8px', height: '26px', fontSize: '0.7rem', color: '#10b981', borderColor: '#10b981' }}
+                              style={{ padding: '6px 12px', height: '34px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '8px', color: '#10b981', borderColor: '#10b981' }}
                             >
-                              واتساب 💬
+                              <Icons.MessageCircle size={14} />
+                              <span>مراسلة</span>
                             </button>
                             <button
                               onClick={(e) => {
@@ -1063,9 +1121,10 @@ export const BookingsView = () => {
                                 setDrawerBooking(b);
                               }}
                               className="btn btn-primary btn-sm"
-                              style={{ padding: '4px 8px', height: '26px', fontSize: '0.7rem' }}
+                              style={{ padding: '6px 12px', height: '34px', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '4px', borderRadius: '8px' }}
                             >
-                              تفاصيل
+                              <Icons.Eye size={14} />
+                              <span>التفاصيل</span>
                             </button>
                           </div>
                         </div>
@@ -1162,7 +1221,7 @@ export const BookingsView = () => {
                                 onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
                                 title="إرسال واتساب سريع (اضغط مطولاً للخيارات)"
                               >
-                                <Icons.MessageSquare size={12} fill="#ffffff" stroke="none" />
+                                <Icons.MessageSquare size={12} color="#ffffff" />
                               </button>
                             ) : (
                               <button
@@ -1229,7 +1288,7 @@ export const BookingsView = () => {
                         {/* 4. Timing */}
                         <div style={{ width: '16%', display: 'flex', flexDirection: 'column' }}>
                           <span style={{ fontSize: '0.8rem', fontWeight: 800 }}>📅 {b.date}</span>
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>🕐 {b.isAllDay ? 'طوال اليوم' : (b.startTime || '16:00')}</span>
+                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>🕐 {b.isAllDay ? 'طوال اليوم' : formatTime12h(b.startTime || '16:00')}{b.attendanceTime && ` (حضور: ${b.attendanceTime})`}</span>
                         </div>
 
                         {/* 5. Location */}
@@ -1420,6 +1479,84 @@ export const BookingsView = () => {
                   <label style={{ fontSize: '0.74rem', fontWeight: 800 }}>التاريخ</label>
                   <input type="date" className="form-control" value={drawerEditData.date || ''} onChange={e => setDrawerEditData({ ...drawerEditData, date: e.target.value, startDate: e.target.value, endDate: e.target.value })} />
                 </div>
+
+                {/* Time Picker Block */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px dashed var(--border-color)', paddingTop: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <label style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)', margin: 0 }}>توقيت التغطية:</label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}>
+                      <input
+                        type="checkbox"
+                        checked={editIsAllDay}
+                        onChange={e => setEditIsAllDay(e.target.checked)}
+                        style={{ width: '14px', height: '14px', accentColor: 'var(--primary-color)' }}
+                      />
+                      <span>طوال اليوم 📅</span>
+                    </label>
+                  </div>
+
+                  {!editIsAllDay && (
+                    <div style={{ display: 'flex', gap: '6px', width: '100%' }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditCoveragePeriod('صباحًا')}
+                        className={`btn ${editCoveragePeriod === 'صباحًا' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          borderRadius: '6px',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          fontSize: '0.8rem',
+                          border: '1px solid var(--border-color)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        ☀️ صباحًا
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditCoveragePeriod('مساءً')}
+                        className={`btn ${editCoveragePeriod === 'مساءً' ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{
+                          flex: 1,
+                          height: '36px',
+                          borderRadius: '6px',
+                          fontWeight: 'bold',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px',
+                          fontSize: '0.8rem',
+                          border: '1px solid var(--border-color)',
+                          transition: 'all 0.2s ease'
+                        }}
+                      >
+                        🌙 مساءً
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Attendance Time Picker */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px dashed var(--border-color)', paddingTop: '10px' }}>
+                  <label style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-muted)' }}>وقت الحضور (اختياري):</label>
+                  <select
+                    value={editAttendanceTime}
+                    onChange={e => setEditAttendanceTime(e.target.value)}
+                    className="form-control"
+                    style={{ height: '36px', borderRadius: '6px', fontSize: '0.8rem', padding: '0 8px' }}
+                  >
+                    <option value="">اختر وقت الحضور ⏰</option>
+                    {generateAttendanceTimeOptions().map(opt => (
+                      <option key={opt} value={opt}>{opt}</option>
+                    ))}
+                  </select>
+                </div>
+
                 <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
                   <button onClick={handleSaveDrawerEdit} className="btn btn-primary" style={{ flex: 1 }}>حفظ</button>
                   <button onClick={() => setIsDrawerEditing(false)} className="btn btn-secondary" style={{ flex: 1 }}>إلغاء</button>
@@ -1501,7 +1638,7 @@ export const BookingsView = () => {
 
                   <div>
                     <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>الموعد والتوقيت:</span>
-                    <p style={{ fontWeight: 800, margin: '2px 0 0 0' }}>📅 {drawerBooking.date} ({drawerBooking.startTime || '16:00'})</p>
+                    <p style={{ fontWeight: 800, margin: '2px 0 0 0' }}>📅 {drawerBooking.date} ({drawerBooking.isAllDay ? 'طوال اليوم' : (drawerBooking.startTime === 'صباحًا' || drawerBooking.startTime === 'مساءً' ? drawerBooking.startTime : `من ${formatTime12h(drawerBooking.startTime || '16:00')} إلى ${formatTime12h(drawerBooking.endTime || '20:00')}`)}{drawerBooking.attendanceTime && ` - الحضور: ${drawerBooking.attendanceTime}`})</p>
                   </div>
 
                   <div>
@@ -1575,7 +1712,7 @@ export const BookingsView = () => {
                       {drawerBooking.changeLogs && drawerBooking.changeLogs.map((log, lIdx) => (
                         <div key={lIdx} style={{ fontSize: '0.7rem', padding: '6px', backgroundColor: 'var(--bg-main)', borderRadius: '6px', border: '1px solid var(--border-color)' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.66rem' }}>
-                            <span>{log.timestamp}</span>
+                            <span>{formatDateTime12h(log.timestamp)}</span>
                             <strong>{log.userName}</strong>
                           </div>
                           <p style={{ margin: '4px 0 0 0', fontWeight: 700 }}>{log.action}</p>
@@ -2543,7 +2680,7 @@ const CooperationLogView = () => {
                       <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-main)', fontSize: '0.8rem' }}>
                         <div>
                           <strong>{b.title}</strong>
-                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>{b.date} | 🕐 {b.startTime} - {b.endTime} | 📍 {b.location}</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>{b.date} | 🕐 {b.isAllDay ? 'طوال اليوم' : (b.startTime === 'صباحًا' || b.startTime === 'مساءً' ? b.startTime : `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`)}{b.attendanceTime && ` (حضور: ${b.attendanceTime})`} | 📍 {b.location}</div>
                         </div>
                         <strong style={{ fontSize: '0.86rem', color: 'var(--primary-color)' }}>{formatCurrency(b.totalPrice)}</strong>
                       </div>

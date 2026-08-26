@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
+import { formatDateTime12h } from '../../utils/helpers';
 
 export const AuditLogsView = () => {
   const { auditLogs } = useApp();
@@ -29,7 +30,7 @@ export const AuditLogsView = () => {
             {auditLogs && auditLogs.map((log, idx) => (
               <tr key={log.id || idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
                 <td style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontFamily: 'monospace', padding: '12px' }}>
-                  {log.timestamp}
+                  {formatDateTime12h(log.timestamp)}
                 </td>
                 <td style={{ padding: '12px' }}><strong>{log.userName}</strong></td>
                 <td style={{ padding: '12px' }}><span className="badge badge-neutral" style={{ fontSize: '0.66rem' }}>{log.userRole}</span></td>

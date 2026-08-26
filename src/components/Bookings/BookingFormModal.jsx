@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
-import { formatBookingNumber } from '../../utils/helpers';
+import { formatBookingNumber, parseTime12hTo24h, parse24hToParts, generateAttendanceTimeOptions } from '../../utils/helpers';
 
 export const BookingFormModal = () => {
   const {
@@ -22,6 +22,9 @@ export const BookingFormModal = () => {
   const [bookingDate, setBookingDate] = useState('');
   const [category, setCategory] = useState('تصوير مناسبة');
   const [startTime, setStartTime] = useState('16:00');
+  const [coveragePeriod, setCoveragePeriod] = useState('صباحًا');
+  const [isAllDay, setIsAllDay] = useState(false);
+  const [attendanceTime, setAttendanceTime] = useState('');
   
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [savedBooking, setSavedBooking] = useState(null);
@@ -42,6 +45,13 @@ export const BookingFormModal = () => {
 
   const dropdownRef = useRef(null);
 
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   // Initialize form defaults when opened
   useEffect(() => {
     if (isBookingFormOpen) {
@@ -52,7 +62,9 @@ export const BookingFormModal = () => {
       const todayStr = `${yyyy}-${mm}-${dd}`;
       
       const hour = today.getHours();
-      setStartTime(`${String(hour).padStart(2, '0')}:00`);
+      setCoveragePeriod(hour < 12 ? 'صباحًا' : 'مساءً');
+      setIsAllDay(false);
+      setAttendanceTime('');
       setBookingDate(selectedDateForBooking || todayStr);
       setCategory('تصوير مناسبة');
       setSavedBooking(null);
@@ -168,9 +180,10 @@ export const BookingFormModal = () => {
       bookingType,
       title: bookingTitle,
       category,
-      startTime: startTime || '16:00',
-      endTime: '20:00',
-      isAllDay: true,
+      startTime: isAllDay ? 'طوال اليوم' : coveragePeriod,
+      endTime: isAllDay ? 'طوال اليوم' : coveragePeriod,
+      isAllDay,
+      attendanceTime: attendanceTime || '',
       location: 'موقع استوديو ستار ميديا',
       deposit: null,
       paidAmount: 0,
@@ -346,27 +359,39 @@ export const BookingFormModal = () => {
   };
 
   return (
-    <div className="modal-overlay" onClick={() => setIsBookingFormOpen(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', direction: 'rtl' }}>
+    <div className="modal-overlay" onClick={() => setIsBookingFormOpen(false)} style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(15, 23, 42, 0.75)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: isMobile ? 'flex-end' : 'center', justifyContent: 'center', direction: 'rtl' }}>
       <div
-        className="modal-content"
+        className="modal-content animate-drawer"
         onClick={e => e.stopPropagation()}
-        style={{
-          maxWidth: '450px',
+        style={isMobile ? {
+          width: '100%',
+          maxWidth: '100%',
+          backgroundColor: 'var(--bg-card)',
+          borderRadius: '24px 24px 0 0',
+          border: '1px solid var(--border-color)',
+          borderBottom: 'none',
+          height: '85vh',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: '0 -10px 25px -5px rgba(0, 0, 0, 0.2)',
+          padding: '20px 20px 16px 20px',
+          overflow: 'hidden'
+        } : {
+          maxWidth: '500px',
           width: '90%',
           backgroundColor: 'var(--bg-card)',
           padding: '24px',
           borderRadius: '16px',
           border: '1px solid var(--border-color)',
           maxHeight: '90vh',
-          overflowY: 'auto',
           display: 'flex',
           flexDirection: 'column',
-          gap: '16px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)'
+          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.2)',
+          overflow: 'hidden'
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px', marginBottom: '12px' }}>
           <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 950, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
             <Icons.Zap size={18} style={{ color: getThemeColor() }} />
             <span>+ حجز سريع للخضوع للجدولة</span>
@@ -375,6 +400,9 @@ export const BookingFormModal = () => {
             <Icons.X size={18} />
           </button>
         </div>
+
+        {/* Form Body Scrollable Container */}
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px', paddingLeft: '4px', paddingRight: '4px', marginBottom: '8px' }}>
 
         {/* 1. Entity type tab selector */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
@@ -535,6 +563,83 @@ export const BookingFormModal = () => {
             </select>
           </div>
         )}
+
+        {/* Time Picker Block */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderTop: '1px dashed var(--border-color)', paddingTop: '12px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <label style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--text-muted)', margin: 0 }}>توقيت التغطية:</label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.74rem', fontWeight: 800, color: 'var(--text-main)', cursor: 'pointer', margin: 0 }}>
+              <input
+                type="checkbox"
+                checked={isAllDay}
+                onChange={e => setIsAllDay(e.target.checked)}
+                style={{ width: '15px', height: '15px', accentColor: 'var(--primary-color)' }}
+              />
+              <span>طوال اليوم (مهمة ممتدة) 📅</span>
+            </label>
+          </div>
+
+          {!isAllDay && (
+            <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
+              <button
+                type="button"
+                onClick={() => setCoveragePeriod('صباحًا')}
+                className={`btn ${coveragePeriod === 'صباحًا' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  flex: 1,
+                  height: '40px',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontSize: '0.85rem',
+                  border: '1px solid var(--border-color)',
+                  transition: 'all 0.2s ease-in-out'
+                }}
+              >
+                ☀️ صباحًا
+              </button>
+              <button
+                type="button"
+                onClick={() => setCoveragePeriod('مساءً')}
+                className={`btn ${coveragePeriod === 'مساءً' ? 'btn-primary' : 'btn-secondary'}`}
+                style={{
+                  flex: 1,
+                  height: '40px',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  fontSize: '0.85rem',
+                  border: '1px solid var(--border-color)',
+                  transition: 'all 0.2s ease-in-out'
+                }}
+              >
+                🌙 مساءً
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Attendance Time Picker */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', borderTop: '1px dashed var(--border-color)', paddingTop: '12px' }}>
+          <label style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--text-muted)' }}>وقت الحضور (اختياري):</label>
+          <select
+            value={attendanceTime}
+            onChange={e => setAttendanceTime(e.target.value)}
+            className="form-control"
+            style={{ height: '40px', borderRadius: '10px', fontSize: '0.84rem', padding: '0 10px' }}
+          >
+            <option value="">اختر وقت الحضور ⏰</option>
+            {generateAttendanceTimeOptions().map(opt => (
+              <option key={opt} value={opt}>{opt}</option>
+            ))}
+          </select>
+        </div>
 
         {/* ─── DYNAMIC FINANCIAL & SPECIFIC FIELDS ─── */}
         
@@ -858,31 +963,35 @@ export const BookingFormModal = () => {
 
 
 
-        {/* 5. Save Button */}
-        <button
-          type="button"
-          onClick={handleSave}
-          disabled={!entitySearch.trim()}
-          className="btn btn-primary"
-          style={{
-            height: '46px',
-            borderRadius: '10px',
-            fontSize: '0.94rem',
-            fontWeight: 950,
-            marginTop: '10px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            cursor: entitySearch.trim() ? 'pointer' : 'not-allowed',
-            opacity: entitySearch.trim() ? 1 : 0.6,
-            backgroundColor: getThemeColor(),
-            borderColor: getThemeColor()
-          }}
-        >
-          <Icons.Save size={18} />
-          <span>حفظ وتأكيد الحجز 💾</span>
-        </button>
+        </div>
+
+        {/* Footer Save Button fixed at the bottom */}
+        <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', backgroundColor: 'var(--bg-card)', width: '100%' }}>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!entitySearch.trim()}
+            className="btn btn-primary"
+            style={{
+              width: '100%',
+              height: '46px',
+              borderRadius: '10px',
+              fontSize: '0.94rem',
+              fontWeight: 950,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              cursor: entitySearch.trim() ? 'pointer' : 'not-allowed',
+              opacity: entitySearch.trim() ? 1 : 0.6,
+              backgroundColor: getThemeColor(),
+              borderColor: getThemeColor()
+            }}
+          >
+            <Icons.Save size={18} />
+            <span>حفظ وتأكيد الحجز 💾</span>
+          </button>
+        </div>
 
       </div>
     </div>

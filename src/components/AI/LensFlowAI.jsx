@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
+import { formatTime12h } from '../../utils/helpers';
 
 export const LensFlowAI = () => {
   const { bookings, team, tasks, invoices, checkBookingConflicts } = useApp();
@@ -60,7 +61,7 @@ export const LensFlowAI = () => {
       } else if (query.includes('قادمة') || query.includes('حجوزات')) {
         const upcoming = bookings ? bookings.filter(b => b.status === 'مؤكد') : [];
         if (upcoming.length > 0) {
-          replyText = `📅 الحجوزات القادمة المجدولة بالتقويم هي **${upcoming.length} حجوزات**: \n` + upcoming.map(b => `- **${b.title}** بتاريخ (${b.date}) الساعة ${b.startTime}.`).join('\n');
+          replyText = `📅 الحجوزات القادمة المجدولة بالتقويم هي **${upcoming.length} حجوزات**: \n` + upcoming.map(b => `- **${b.title}** بتاريخ (${b.date}) الساعة ${b.isAllDay ? 'طوال اليوم' : formatTime12h(b.startTime)}.`).join('\n');
         } else {
           replyText = `📅 لا توجد حجوزات مؤكدة قادمة حالياً.`;
         }

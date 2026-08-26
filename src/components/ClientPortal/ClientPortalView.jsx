@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../Common/StatusBadge';
-import { formatCurrency, formatBookingNumber } from '../../utils/helpers';
+import { formatCurrency, formatBookingNumber, formatTime12h } from '../../utils/helpers';
 import * as Icons from 'lucide-react';
 
 export const ClientPortalView = ({ bookingId }) => {
@@ -107,7 +107,7 @@ export const ClientPortalView = ({ bookingId }) => {
           <div>
             <span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.76rem', marginBottom: '2px' }}>📅 تاريخ ووقت التغطية:</span>
             <strong style={{ fontFamily: 'Inter, sans-serif' }}>
-              {targetBooking.startDate || targetBooking.date} ({targetBooking.startTime} - {targetBooking.endTime})
+              {targetBooking.startDate || targetBooking.date} ({targetBooking.isAllDay ? 'طوال اليوم' : (targetBooking.startTime === 'صباحًا' || targetBooking.startTime === 'مساءً' ? targetBooking.startTime : `${formatTime12h(targetBooking.startTime)} - ${formatTime12h(targetBooking.endTime)}`)}{targetBooking.attendanceTime && ` (حضور: ${targetBooking.attendanceTime})`})
             </strong>
           </div>
 

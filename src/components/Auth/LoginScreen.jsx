@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
 import { navigateTo } from '../../routes/Router';
+import { auth } from '../../firebase';
+import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 
 export const LoginScreen = ({ onLogin }) => {
   const { team, loginUser } = useApp();
@@ -15,49 +17,86 @@ export const LoginScreen = ({ onLogin }) => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetSent, setResetSent] = useState(false);
 
-  const handleEmailLogin = (e) => {
+  const handleEmailLogin = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
     const cleanEmail = (email || '').toLowerCase().trim();
+    const cleanPassword = password;
 
-    setTimeout(() => {
-      // 1. Check if Admin
-      if (cleanEmail === 'ahdalamary@gmail.com' || cleanEmail === 'ahed@lensflow.sa' || cleanEmail === 'admin@lensflow.sa') {
-        const adminMember = team.find(m => m.id === 1) || {
-          id: 1,
-          name: 'عاهد العماري',
-          role: 'مصور فريلانسر / منظم حجوزاتي العهد ستار 👑',
-          email: 'ahdalamary@gmail.com',
-          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-          isSupervisor: true
-        };
-        if (loginUser) loginUser(adminMember);
-        setIsLoading(false);
-        if (onLogin) onLogin(adminMember);
-        navigateTo('/admin/dashboard');
-        return;
-      }
+    if (!cleanPassword || cleanPassword.length < 6) {
+      setIsLoading(false);
+      setError('❌ كلمة المرور يجب أن تتكون من 6 خانات على الأقل (مثال: 123456).');
+      return;
+    }
 
-      // 2. Search in dynamic team members list
-      const foundMember = team.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail);
-      if (foundMember) {
-        if (loginUser) loginUser(foundMember);
-        setIsLoading(false);
-        if (onLogin) onLogin(foundMember);
-        const isSuper = foundMember.isSupervisor || (foundMember.role && (foundMember.role.includes('مشرف') || foundMember.role.includes('مدير')));
-        if (isSuper) {
-          navigateTo('/admin/dashboard');
-        } else {
-          navigateTo('/employee/dashboard');
-        }
-        return;
-      }
+    // Check if the user exists in our local team list
+    const foundMember = team.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail) || 
+      ( (cleanEmail === 'ahdalamary@gmail.com' || cleanEmail === 'ahed@lensflow.sa' || cleanEmail === 'admin@lensflow.sa') ? {
+        id: 1,
+        name: 'عاهد العماري',
+        role: 'مصور فريلانسر / منظم حجوزاتي العهد ستار 👑',
+        email: 'ahdalamary@gmail.com',
+        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+        isSupervisor: true
+      } : null );
 
+    if (!foundMember) {
       setIsLoading(false);
       setError('❌ لم يتم العثور على بريد إلكتروني مسجل كعضو في الفريق. يرجى مراجعة مدير الاستوديو.');
-    }, 400);
+      return;
+    }
+
+    try {
+      // 1. Try signing in using Firebase Auth
+      await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+      console.log("Logged in to Firebase Auth successfully as:", cleanEmail);
+      
+      if (loginUser) loginUser(foundMember);
+      setIsLoading(false);
+      if (onLogin) onLogin(foundMember);
+      
+      const isSuper = foundMember.isSupervisor || (foundMember.role && (foundMember.role.includes('مشرف') || foundMember.role.includes('مدير')));
+      if (isSuper) {
+        navigateTo('/admin/dashboard');
+      } else {
+        navigateTo('/employee/dashboard');
+      }
+    } catch (err) {
+      console.warn("Firebase Auth login failed:", err.code, err.message);
+      
+      // 2. Auto-register if the error is user-not-found or invalid-credential (since we verified they are on the team)
+      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+        try {
+          console.log("User not found in Firebase. Attempting auto-registration for team member:", cleanEmail);
+          await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+          console.log("Firebase Auth user registered successfully:", cleanEmail);
+          
+          if (loginUser) loginUser(foundMember);
+          setIsLoading(false);
+          if (onLogin) onLogin(foundMember);
+          
+          const isSuper = foundMember.isSupervisor || (foundMember.role && (foundMember.role.includes('مشرف') || foundMember.role.includes('مدير')));
+          if (isSuper) {
+            navigateTo('/admin/dashboard');
+          } else {
+            navigateTo('/employee/dashboard');
+          }
+        } catch (regErr) {
+          console.error("Auto-registration in Firebase Auth failed:", regErr);
+          setIsLoading(false);
+          if (regErr.code === 'auth/email-already-in-use') {
+            setError('❌ كلمة المرور التي أدخلتها غير صحيحة.');
+          } else {
+            setError(`❌ فشل تسجيل الحساب تلقائيًا في الخدمة: ${regErr.message}`);
+          }
+        }
+      } else {
+        setIsLoading(false);
+        setError(`❌ خطأ في تسجيل الدخول: ${err.message}`);
+      }
+    }
   };
 
   return (
@@ -114,7 +153,7 @@ export const LoginScreen = ({ onLogin }) => {
                 type="button"
                 onClick={() => {
                   setEmail(member.email || '');
-                  setPassword(member.password || 'photo123');
+                  setPassword((member.password && member.password.length >= 6) ? member.password : '123456');
                 }}
                 style={{
                   display: 'flex',

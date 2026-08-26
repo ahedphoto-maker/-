@@ -1,0 +1,19 @@
+{
+  "name": "منظومة العهد لإدارة الاستوديوهات",
+  "short_name": "منظومة العهد",
+  "description": "نظام ذكي وشامل لإدارة الحجوزات، العملاء، ومصوري الميدان",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1e1b4b",
+  "theme_color": "#4338ca",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

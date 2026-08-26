@@ -29,6 +29,7 @@ import { LensFlowAI } from './components/AI/LensFlowAI';
 import { BookingsMap } from './components/Map/BookingsMap';
 import { LoginScreen } from './components/Auth/LoginScreen';
 import { ClientPortalView } from './components/ClientPortal/ClientPortalView';
+import { NotificationPromptModal } from './components/Notifications/NotificationPromptModal';
 import * as Icons from 'lucide-react';
 
 import { useRoute, navigateTo } from './routes/Router';
@@ -42,7 +43,10 @@ const MainLayout = () => {
     currentUser,
     loginUser,
     activeOverlay,
-    setActiveOverlay
+    setActiveOverlay,
+    bookings,
+    setSelectedBooking,
+    setIsBookingDetailOpen
   } = useApp();
   const [routeInfo] = useRoute();
 
@@ -87,6 +91,37 @@ const MainLayout = () => {
       document.body.style.overflow = '';
     };
   }, [activeOverlay]);
+
+  // Deep-linking routing interception for push notification clicks
+  useEffect(() => {
+    if (routeInfo.queryParams && bookings && bookings.length > 0) {
+      const { entityType, entityId } = routeInfo.queryParams;
+      if (entityType === 'booking' && entityId) {
+        const found = bookings.find(b => String(b.id) === String(entityId) || b.bookingNumber === entityId);
+        if (found) {
+          if (setSelectedBooking) setSelectedBooking(found);
+          if (setActiveTab) setActiveTab('bookings');
+          if (setIsBookingDetailOpen) setIsBookingDetailOpen(true);
+          // Clear query parameters from address bar to prevent looping on reload
+          navigateTo(routeInfo.fullPath);
+        }
+      }
+    }
+  }, [routeInfo.queryParams, bookings, setSelectedBooking, setActiveTab, setIsBookingDetailOpen, routeInfo.fullPath]);
+
+  // Trigger notification prompt modal for first-time logged in users
+  useEffect(() => {
+    if (isAuthenticated && typeof window !== 'undefined' && 'Notification' in window) {
+      const permission = Notification.permission;
+      const alreadyPrompted = localStorage.getItem('star_media_notification_prompted') === 'true';
+      if (permission === 'default' && !alreadyPrompted) {
+        const timer = setTimeout(() => {
+          if (setActiveOverlay) setActiveOverlay('NOTIFICATION_PROMPT');
+        }, 2000);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [isAuthenticated, setActiveOverlay]);
 
   // Back button interception to close active overlay
   useEffect(() => {
@@ -163,6 +198,7 @@ const MainLayout = () => {
       {activeOverlay === 'BOOKING' && <BookingFormModal />}
       {activeOverlay === 'NOTIFICATIONS' && <NotificationOverlayModal isOpen={true} onClose={() => setActiveOverlay && setActiveOverlay('NONE')} />}
       {activeOverlay === 'USER_MENU' && <UserMenuModal isOpen={true} onClose={() => setActiveOverlay && setActiveOverlay('NONE')} />}
+      {activeOverlay === 'NOTIFICATION_PROMPT' && <NotificationPromptModal />}
       
       {celebrationToast && (
         <div className="celebration-toast" style={{ position: 'fixed', bottom: '20px', left: '20px', backgroundColor: 'var(--primary-color)', color: '#ffffff', padding: '12px 24px', borderRadius: '50px', display: 'flex', alignItems: 'center', gap: '8px', zIndex: 99999, boxShadow: '0 4px 14px rgba(99,102,241,0.4)', animation: 'slideIn 0.3s ease' }}>

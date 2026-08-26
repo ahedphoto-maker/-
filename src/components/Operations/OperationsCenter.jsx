@@ -1,7 +1,7 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
-import { formatCurrency, formatBookingNumber } from '../../utils/helpers';
+import { formatCurrency, formatBookingNumber, formatTime12h, formatDateTime12h } from '../../utils/helpers';
 
 export const OperationsCenter = () => {
   const { 
@@ -158,10 +158,10 @@ export const OperationsCenter = () => {
                   <div key={idx} style={{ fontSize: '0.8rem', padding: '6px 8px', borderRadius: '8px', backgroundColor: 'var(--bg-main)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                       <strong>{b.title}</strong>
-                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginTop: '2px' }}>⏱️ {b.startTime} | 📍 {b.location}</div>
+                      <div style={{ color: 'var(--text-muted)', fontSize: '0.74rem', marginTop: '2px' }}>⏱️ {b.isAllDay ? 'طوال اليوم' : formatTime12h(b.startTime)} | 📍 {b.location}</div>
                     </div>
                     <button 
-                      onClick={() => handleWhatsApp(b.clientPhone, `السلام عليكم ${b.clientName}، نؤكد موعد تصويرنا اليوم/غداً: ${b.title} الساعة ${b.startTime}. بالتوفيق 🌸`)}
+                      onClick={() => handleWhatsApp(b.clientPhone, `السلام عليكم ${b.clientName}، نؤكد موعد تصويرنا اليوم/غداً: ${b.title} الساعة ${b.isAllDay ? 'طوال اليوم' : formatTime12h(b.startTime)}. بالتوفيق 🌸`)}
                       className="btn btn-secondary btn-icon" 
                       style={{ width: '28px', height: '28px', color: '#10b981' }}
                     >
@@ -366,7 +366,7 @@ export const OperationsCenter = () => {
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
                     <span style={{ fontWeight: 800, fontSize: '0.9rem' }}>{log.action}</span>
-                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{log.timestamp ? log.timestamp.substring(11, 16) : ''}</span>
+                    <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{log.timestamp ? formatTime12h(log.timestamp.substring(11, 16)) : ''}</span>
                   </div>
                   <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '4px', margin: '4px 0 0 0' }}>{log.details}</p>
                   <div style={{ display: 'flex', gap: '8px', fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '6px', flexWrap: 'wrap' }}>

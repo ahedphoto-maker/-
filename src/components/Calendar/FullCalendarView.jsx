@@ -3,7 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../Common/StatusBadge';
 import * as Icons from 'lucide-react';
 import { navigateTo } from '../../routes/Router';
-import { formatBookingNumber } from '../../utils/helpers';
+import { formatBookingNumber, formatTime12h } from '../../utils/helpers';
 
 export const FullCalendarView = () => {
   const { bookings, setSelectedBooking, setIsBookingDetailOpen, setIsBookingFormOpen, openBookingFormWithDate } = useApp();
@@ -489,11 +489,16 @@ export const FullCalendarView = () => {
             <div style={{ padding: isMobile ? '10px' : '20px' }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {hoursOfDay.map(hour => {
-                  const hourBookings = (bookings || []).filter(b => isBookingOnDate(b, selectedDateStr) && (b.startTime === hour || (b.startTime && b.startTime.startsWith(hour.slice(0, 2)))));
+                  const hourBookings = (bookings || []).filter(b => {
+                    if (!isBookingOnDate(b, selectedDateStr)) return false;
+                    if (b.startTime === 'صباحًا' || b.startTime === 'طوال اليوم') return hour === '09:00';
+                    if (b.startTime === 'مساءً') return hour === '17:00';
+                    return b.startTime === hour || (b.startTime && b.startTime.startsWith(hour.slice(0, 2)));
+                  });
                   return (
                     <div key={hour} style={{ display: 'flex', gap: isMobile ? '8px' : '16px', alignItems: 'center', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)', backgroundColor: 'var(--bg-card)' }}>
                       <div style={{ width: '45px', fontWeight: 800, color: 'var(--primary-color)', fontSize: '0.78rem', textAlign: 'center' }}>
-                        {hour}
+                        {formatTime12h(hour)}
                       </div>
                       <div style={{ flex: 1, display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         {hourBookings.length === 0 ? (
@@ -579,7 +584,7 @@ export const FullCalendarView = () => {
                   </div>
 
                   <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '3px', backgroundColor: 'var(--bg-main)', padding: '6px', borderRadius: '6px' }}>
-                    <div>⏰ الوقت: <strong>{b.startTime || 'غير محدد'} - {b.endTime || 'غير محدد'}</strong></div>
+                    <div>⏰ الوقت: <strong>{b.isAllDay ? 'طوال اليوم' : (b.startTime === 'صباحًا' || b.startTime === 'مساءً' ? b.startTime : `${b.startTime ? formatTime12h(b.startTime) : 'غير محدد'} - ${b.endTime ? formatTime12h(b.endTime) : 'غير محدد'}`)}{b.attendanceTime && ` (حضور: ${b.attendanceTime})`}</strong></div>
                     <div>👤 العميل: <strong>{b.clientName}</strong></div>
                     <div>📍 الموقع: <strong>{b.location || 'الاستوديو'}</strong></div>
                   </div>

@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "al-ahad-app-2026"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

@@ -123,3 +123,121 @@ export const formatBookingNumber = (bookingNumber) => {
   return bookingNumber.toString();
 };
 
+export const formatTime12h = (time24) => {
+  if (time24 === 'صباحًا' || time24 === 'مساءً') return time24;
+  if (time24.includes('ص') || time24.includes('م') || time24.includes('AM') || time24.includes('PM')) {
+    let result = time24;
+    if (result.includes('AM')) result = result.replace('AM', 'ص');
+    if (result.includes('PM')) result = result.replace('PM', 'م');
+    return result;
+  }
+  const parts = time24.split(':');
+  if (parts.length < 2) return time24;
+  let hours = parseInt(parts[0], 10);
+  const minutes = String(parts[1]).padStart(2, '0');
+  const ampm = hours >= 12 ? 'م' : 'ص';
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+export const parseTime12hTo24h = (hourOrString, minutes, ampm) => {
+  if (!hourOrString) return '12:00';
+  
+  // If called with multiple arguments (e.g. hour, minutes, ampm)
+  if (minutes !== undefined && ampm !== undefined) {
+    let hour = parseInt(hourOrString, 10);
+    const min = String(minutes).padStart(2, '0');
+    const isPM = ampm === 'م' || ampm === 'PM';
+    if (isPM && hour < 12) hour += 12;
+    if (!isPM && hour === 12) hour = 0;
+    return `${hour.toString().padStart(2, '0')}:${min}`;
+  }
+  
+  // If called with a single string (e.g. "4:00 م" or "16:00")
+  const timeStr = String(hourOrString);
+  if (!timeStr.includes('ص') && !timeStr.includes('م') && !timeStr.includes('AM') && !timeStr.includes('PM')) {
+    const parts = timeStr.split(':');
+    if (parts.length >= 2) {
+      return `${parts[0].padStart(2, '0')}:${parts[1].padStart(2, '0')}`;
+    }
+    return timeStr;
+  }
+  const cleanTime = timeStr.replace(/[صم\s]/g, '');
+  const parts = cleanTime.split(':');
+  if (parts.length < 2) return '12:00';
+  let hours = parseInt(parts[0], 10);
+  const minutesPart = parts[1];
+  const isPM = timeStr.includes('م') || timeStr.includes('PM');
+  if (isPM && hours < 12) hours += 12;
+  if (!isPM && hours === 12) hours = 0;
+  return `${hours.toString().padStart(2, '0')}:${minutesPart.padStart(2, '0')}`;
+};
+
+export const parse24hToParts = (time24) => {
+  if (!time24) return { hours: '12', minutes: '00', ampm: 'ص' };
+  
+  if (time24.includes('ص') || time24.includes('م') || time24.includes('AM') || time24.includes('PM')) {
+    const cleanTime = time24.replace(/[صم\s]/g, '');
+    const parts = cleanTime.split(':');
+    if (parts.length < 2) return { hours: '12', minutes: '00', ampm: 'ص' };
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    const ampm = time24.includes('م') || time24.includes('PM') ? 'م' : 'ص';
+    return {
+      hours: String(hours),
+      minutes: String(minutes).padStart(2, '0'),
+      ampm
+    };
+  }
+  
+  const parts = time24.split(':');
+  if (parts.length < 2) return { hours: '12', minutes: '00', ampm: 'ص' };
+  let rawHours = parseInt(parts[0], 10);
+  const minutes = parseInt(parts[1], 10);
+  const ampm = rawHours >= 12 ? 'م' : 'ص';
+  let hours = rawHours % 12;
+  hours = hours ? hours : 12;
+  return {
+    hours: String(hours),
+    minutes: String(minutes).padStart(2, '0'),
+    ampm
+  };
+};
+
+export const formatDateTime12h = (dateTimeStr) => {
+  if (!dateTimeStr) return '';
+  try {
+    const date = new Date(dateTimeStr);
+    const formattedDate = date.toISOString().substring(0, 10);
+    const hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'م' : 'ص';
+    const displayHour = hours % 12 || 12;
+    return `${formattedDate} ${displayHour}:${minutes} ${ampm}`;
+  } catch (e) {
+    return dateTimeStr;
+  }
+};
+
+export const getPeriodFromTime = (startTime) => {
+  if (startTime === 'صباحًا' || startTime === 'مساءً') return startTime;
+  if (!startTime) return 'صباحًا';
+  const parts = startTime.split(':');
+  if (parts.length < 2) return 'صباحًا';
+  const hour = parseInt(parts[0], 10);
+  return hour < 12 ? 'صباحًا' : 'مساءً';
+};
+
+export const generateAttendanceTimeOptions = () => {
+  const options = [];
+  const periods = ['ص', 'م'];
+  periods.forEach(p => {
+    const periodLabel = p === 'ص' ? 'صباحًا' : 'مساءً';
+    options.push(`12:00 ${periodLabel}`);
+    for (let h = 1; h <= 11; h++) {
+      options.push(`${h}:00 ${periodLabel}`);
+    }
+  });
+  return options;
+};
