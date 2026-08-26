@@ -1,4 +1,4 @@
-const CACHE_NAME = 'star-media-pwa-cache-v5';
+const CACHE_NAME = 'star-media-pwa-cache-v4';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -51,25 +51,6 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Network-First strategy for HTML navigation requests to allow immediate updates when online
-  if (event.request.mode === 'navigate' || url.endsWith('/index.html') || url === self.location.origin + '/') {
-    event.respondWith(
-      fetch(event.request).then(networkResponse => {
-        if (networkResponse && networkResponse.status === 200) {
-          const responseToCache = networkResponse.clone();
-          caches.open(CACHE_NAME).then(cache => {
-            cache.put(event.request, responseToCache);
-          });
-        }
-        return networkResponse;
-      }).catch(() => {
-        return caches.match(event.request) || caches.match('/index.html');
-      })
-    );
-    return;
-  }
-
-  // Cache-First strategy for static assets
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
       if (cachedResponse) {
@@ -88,6 +69,11 @@ self.addEventListener('fetch', event => {
           });
         }
         return networkResponse;
+      }).catch(() => {
+        // Fallback for document requests when offline
+        if (event.request.mode === 'navigate') {
+          return caches.match('/index.html');
+        }
       });
     })
   );

@@ -17,10 +17,13 @@ export const FinancialsView = () => {
     auditLogs = [],
     addInvoice, 
     updateInvoice,
+    cancelInvoice,
     addPayment, 
     updatePayment,
+    cancelPayment,
     addExpense,
     updateExpense,
+    deleteExpense,
     addAuditLog,
     showCelebration,
     settings,
@@ -517,7 +520,7 @@ export const FinancialsView = () => {
     setFinDeleteModal({ open: true, type: 'expense', id: expenseId, item: target });
   };
 
-  // Confirm delete/cancel handler
+  // Confirm delete/cancel handler using new AppContext actions
   const handleConfirmFinancialCancel = async () => {
     const { type, id, item } = finDeleteModal;
     if (!item) return;
@@ -525,15 +528,14 @@ export const FinancialsView = () => {
     setFinDeleteError('');
     try {
       if (type === 'invoice') {
-        if (updateInvoice) {
-          await Promise.resolve(updateInvoice(id, { status: 'ملغاة' }));
-          addAuditLog('إلغاء فاتورة', `تم إلغاء الفاتورة رقم ${item.invoiceNumber} بقيمة ${formatCurrency(item.total)}`, '⚠️');
+        if (cancelInvoice) {
+          await cancelInvoice(id);
           showCelebration('تم إلغاء الفاتورة! ⚠️');
           if (selectedInvoice?.id === id) setSelectedInvoice(null);
         }
       } else if (type === 'payment') {
-        if (updatePayment) {
-          await Promise.resolve(updatePayment(id, { status: 'ملغي' }));
+        if (cancelPayment) {
+          await cancelPayment(id);
           
           // Refund invoice paid amount
           const relatedInvoice = invoices.find(inv => inv.invoiceNumber === item.invoiceNumber);
@@ -544,20 +546,17 @@ export const FinancialsView = () => {
               status: newPaid === 0 ? 'غير مدفوعة' : 'جزئي'
             }));
           }
-
-          addAuditLog('إلغاء دفعة', `تم إلغاء الدفعة بقيمة ${formatCurrency(item.amount)} للفاتورة ${item.invoiceNumber}`, '⚠️');
           showCelebration('تم إلغاء الدفعة المالية! ⚠️');
         }
       } else if (type === 'expense') {
-        if (updateExpense) {
-          await Promise.resolve(updateExpense(id, { status: 'ملغي' }));
-          addAuditLog('إلغاء مصروف', `تم إلغاء مصروف بقيمة ${formatCurrency(item.amount)}: ${item.title}`, '⚠️');
-          showCelebration('تم إلغاء المصروف المالي! ⚠️');
+        if (deleteExpense) {
+          await deleteExpense(id);
+          showCelebration('تم حذف المصروف المالي بنجاح! 🗑️');
         }
       }
       setFinDeleteModal({ open: false, type: '', id: null, item: null });
     } catch (err) {
-      setFinDeleteError('حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة لاحقاً.');
+      setFinDeleteError(err.message || 'حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة لاحقاً.');
     } finally {
       setFinDeleteLoading(false);
     }
