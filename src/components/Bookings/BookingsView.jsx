@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../Common/StatusBadge';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal';
 import { formatCurrency, formatBookingNumber, formatTime12h, parseTime12hTo24h, parse24hToParts, formatDateTime12h, getPeriodFromTime, generateAttendanceTimeOptions } from '../../utils/helpers';
 import * as Icons from 'lucide-react';
 
@@ -62,6 +63,32 @@ export const BookingsView = () => {
   const [editAttendanceTime, setEditAttendanceTime] = useState('');
   const [activeMenuId, setActiveMenuId] = useState(null);
   const dropdownRef = useRef(null);
+
+  // ─── Delete Booking State ────────────────────────────────────────────
+  const [bookingDeleteModal, setBookingDeleteModal] = useState({ open: false, booking: null });
+  const [bookingDeleteLoading, setBookingDeleteLoading] = useState(false);
+  const [bookingDeleteError, setBookingDeleteError] = useState('');
+
+  const handleDeleteBookingClick = (b) => {
+    setBookingDeleteError('');
+    setBookingDeleteModal({ open: true, booking: b });
+    setActiveMenuId(null);
+  };
+
+  const handleDeleteBookingConfirm = async () => {
+    if (!bookingDeleteModal.booking) return;
+    setBookingDeleteLoading(true);
+    setBookingDeleteError('');
+    try {
+      await Promise.resolve(deleteBooking(bookingDeleteModal.booking.id));
+      setBookingDeleteModal({ open: false, booking: null });
+      if (drawerBooking?.id === bookingDeleteModal.booking.id) setDrawerBooking(null);
+    } catch (err) {
+      setBookingDeleteError('فشل الحذف. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setBookingDeleteLoading(false);
+    }
+  };
 
   // WhatsApp context menu triggers on long press
   const [activeLongPressBookingId, setActiveLongPressBookingId] = useState(null);
@@ -1766,6 +1793,9 @@ export const BookingsView = () => {
           </div>
         </div>
       )}
+
+      {/* Delete Booking Confirmation Modal */}
+      {renderBookingDeleteModal && renderBookingDeleteModal()}
     </div>
   );
 
@@ -1846,6 +1876,18 @@ export const BookingsView = () => {
           <Icons.XCircle size={13} color="#ef4444" />
           <span>إلغاء الحجز</span>
         </button>
+        {userRole === 'admin' && (
+          <>
+            <div style={{ height: '1px', backgroundColor: 'var(--border-color)', margin: '4px 0' }} />
+            <button
+              onClick={() => handleDeleteBookingClick(b)}
+              style={{ ...dropdownItemStyle, color: '#dc2626', backgroundColor: 'rgba(220,38,38,0.05)' }}
+            >
+              <Icons.Trash2 size={13} color="#dc2626" />
+              <span>🗑️ حذف الحجز نهائياً</span>
+            </button>
+          </>
+        )}
       </div>
     );
   }
@@ -1891,6 +1933,39 @@ export const BookingsView = () => {
     navigator.clipboard.writeText(text);
     alert('تم نسخ تفاصيل الجلسة إلى الحافظة لإرسالها للفريق!');
     setActiveMenuId(null);
+  };
+
+  // ─── Booking Delete Confirmation Modal render ─────────────────────────────
+  function renderBookingDeleteModal() {
+    if (!bookingDeleteModal.open || !bookingDeleteModal.booking) return null;
+    const b = bookingDeleteModal.booking;
+    const isCancellableOnly = b.status === 'مؤكد';
+    return (
+      <ConfirmDeleteModal
+        isOpen={true}
+        onClose={() => { setBookingDeleteModal({ open: false, booking: null }); setBookingDeleteError(''); }}
+        onConfirm={handleDeleteBookingConfirm}
+        title={isCancellableOnly ? 'إلغاء الحجز المؤكد' : 'حذف الحجز'}
+        description={isCancellableOnly
+          ? `الحجز بحالة “مؤكد”. سيتم تحويله إلى “ملغي” بدلاً من حذفه نهائياً للحفاظ على السجلات.`
+          : `هل أنت متأكد من حذف هذا الحجز بشكل نهائي؟`
+        }
+        itemDetails={[
+          { label: 'رقم الحجز', value: formatBookingNumber(b.bookingNumber) },
+          { label: 'اسم العميل', value: b.clientName || b.companyName || b.freelancerName || '-' },
+          { label: 'التاريخ', value: b.date || b.startDate || '-' },
+          { label: 'الحالة الحالية', value: b.status || '-' },
+        ]}
+        warnings={isCancellableOnly
+          ? ['تحويل إلى ملغي: لن يتم حذف بيانات الحجز من السجل ولكن ستتغيّر حالته إلى “ملغي”.']
+          : []
+        }
+        confirmLabel={isCancellableOnly ? 'تحويل إلى ملغي' : 'حذف الحجز'}
+        confirmVariant={isCancellableOnly ? 'warning' : 'danger'}
+        isLoading={bookingDeleteLoading}
+        errorMsg={bookingDeleteError}
+      />
+    );
   };
 };
 

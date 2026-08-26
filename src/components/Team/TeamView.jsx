@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal';
 
 export const TeamView = () => {
-  const { team, addTeamMember, updateTeamMember, deleteTeamMember, toggleSupervisorRole, userRole } = useApp();
+  const { team, addTeamMember, updateTeamMember, deleteTeamMember, toggleSupervisorRole, userRole, bookings } = useApp();
 
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingMember, setEditingMember] = useState(null);
@@ -21,6 +22,32 @@ export const TeamView = () => {
     status: 'نشط',
     points: 100
   });
+
+  // ─── Delete Member State ─────────────────────────────────────────────
+  const [deleteModal, setDeleteModal] = useState({ open: false, member: null });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleDeleteMemberClick = (member) => {
+    setDeleteError('');
+    setDeleteModal({ open: true, member });
+  };
+
+  const handleDeleteMemberConfirm = async () => {
+    if (!deleteModal.member) return;
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      if (deleteTeamMember) {
+        await Promise.resolve(deleteTeamMember(deleteModal.member.id));
+      }
+      setDeleteModal({ open: false, member: null });
+    } catch (err) {
+      setDeleteError('فشل حذف الموظف. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const togglePasswordVisibility = (id) => {
     setVisiblePasswords(prev => ({ ...prev, [id]: !prev[id] }));
@@ -77,18 +104,36 @@ export const TeamView = () => {
     }
   };
 
-  const handleDeleteMember = (member) => {
-    if (window.confirm(`⚠️ هل أنت متأكد من حذف الموظف "${member.name}" من فريق العمل؟`)) {
-      try {
-        if (deleteTeamMember) {
-          deleteTeamMember(member.id);
-        }
-        alert('🗑️ تم حذف الموظف بنجاح.');
-      } catch (err) {
-        console.error(err);
-        alert('❌ حدث خطأ عند حذف الموظف.');
-      }
+  // Removed old handleDeleteMember helper
+
+  const renderMemberDeleteModal = () => {
+    if (!deleteModal.open || !deleteModal.member) return null;
+    const member = deleteModal.member;
+    const assignedBookings = bookings?.filter(b => b.teamMemberIds?.includes(member.id)) || [];
+    const warnings = [];
+    if (assignedBookings.length > 0) {
+      warnings.push(`هذا الموظف لديه ${assignedBookings.length} مهمة/جلسة تصوير نشطة أو معينة له. سيؤدي حذفه إلى إبقائها بدون مصور معين.`);
     }
+    return (
+      <ConfirmDeleteModal
+        isOpen={true}
+        onClose={() => setDeleteModal({ open: false, member: null })}
+        onConfirm={handleDeleteMemberConfirm}
+        title="حذف موظف من الفريق"
+        description={`هل أنت متأكد من حذف الموظف "${member.name}" وإلغاء صلاحية دخوله إلى النظام تماماً؟`}
+        itemDetails={[
+          { label: 'اسم الموظف', value: member.name },
+          { label: 'الدور الوظيفي', value: member.role },
+          { label: 'رقم الجوال', value: member.phone },
+          { label: 'عدد المهام المعينة', value: assignedBookings.length },
+        ]}
+        warnings={warnings}
+        confirmLabel="حذف الموظف نهائياً"
+        confirmVariant="danger"
+        isLoading={deleteLoading}
+        errorMsg={deleteError}
+      />
+    );
   };
 
   return (
@@ -229,7 +274,7 @@ export const TeamView = () => {
                     </button>
                     {member.id !== 1 && (
                       <button
-                        onClick={() => handleDeleteMember(member)}
+                        onClick={() => handleDeleteMemberClick(member)}
                         className="btn btn-danger btn-sm"
                         style={{ padding: '4px 8px' }}
                         title="حذف الموظف"
@@ -448,6 +493,8 @@ export const TeamView = () => {
           </div>
         </div>
       )}
+      {/* Member Confirm Delete Modal */}
+      {renderMemberDeleteModal && renderMemberDeleteModal()}
     </div>
   );
 };

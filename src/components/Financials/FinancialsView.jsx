@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../Common/StatusBadge';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal';
 import { formatCurrency, formatBookingNumber, formatTime12h } from '../../utils/helpers';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
 import * as Icons from 'lucide-react';
@@ -39,6 +40,11 @@ export const FinancialsView = () => {
   const [selectedReportForPDF, setSelectedReportForPDF] = useState(null); // Print modal for PDF Report
   const [editingInvoice, setEditingInvoice] = useState(null); // Edit invoice modal
   const [editingExpense, setEditingExpense] = useState(null); // Edit expense modal
+
+  // ─── Delete/Cancel Financials State ──────────────────────────────────────────
+  const [finDeleteModal, setFinDeleteModal] = useState({ open: false, type: '', id: null, item: null });
+  const [finDeleteLoading, setFinDeleteLoading] = useState(false);
+  const [finDeleteError, setFinDeleteError] = useState('');
 
   // Search & Global Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -489,48 +495,71 @@ export const FinancialsView = () => {
     setEditingInvoice(null);
   };
 
-  // Action cancel invoice
-  const handleCancelInvoice = (invoiceId) => {
-    if (!window.confirm('هل أنت متأكد من إلغاء هذه الفاتورة؟ سيتم إلغاؤها محاسبياً والاحتفاظ بسجلها.')) return;
+  // Action cancel triggers
+  const triggerCancelInvoice = (invoiceId) => {
     const target = invoices.find(inv => inv.id === invoiceId);
-    if (target && updateInvoice) {
-      updateInvoice(invoiceId, { status: 'ملغاة' });
-      addAuditLog('إلغاء فاتورة', `تم إلغاء الفاتورة رقم ${target.invoiceNumber} بقيمة ${formatCurrency(target.total)}`, '⚠️');
-      showCelebration('تم إلغاء الفاتورة! ⚠️');
-      if (selectedInvoice?.id === invoiceId) setSelectedInvoice(null);
-    }
+    if (!target) return;
+    setFinDeleteError('');
+    setFinDeleteModal({ open: true, type: 'invoice', id: invoiceId, item: target });
   };
 
-  // Action cancel payment
-  const handleCancelPayment = (paymentId) => {
-    if (!window.confirm('هل أنت متأكد من إلغاء هذه العملية المالية؟ سيتم إدراجها كملغاة محاسبياً.')) return;
+  const triggerCancelPayment = (paymentId) => {
     const target = payments.find(p => p.id === paymentId);
-    if (target && updatePayment) {
-      updatePayment(paymentId, { status: 'ملغي' });
-      
-      // Refund invoice paid amount
-      const relatedInvoice = invoices.find(inv => inv.invoiceNumber === target.invoiceNumber);
-      if (relatedInvoice && updateInvoice) {
-        const newPaid = Math.max(0, (relatedInvoice.paid || 0) - target.amount);
-        updateInvoice(relatedInvoice.id, {
-          paid: newPaid,
-          status: newPaid === 0 ? 'غير مدفوعة' : 'جزئي'
-        });
-      }
-
-      addAuditLog('إلغاء دفعة', `تم إلغاء الدفعة بقيمة ${formatCurrency(target.amount)} للفاتورة ${target.invoiceNumber}`, '⚠️');
-      showCelebration('تم إلغاء الدفعة المالية! ⚠️');
-    }
+    if (!target) return;
+    setFinDeleteError('');
+    setFinDeleteModal({ open: true, type: 'payment', id: paymentId, item: target });
   };
 
-  // Action cancel expense
-  const handleCancelExpense = (expenseId) => {
-    if (!window.confirm('هل أنت متأكد من إلغاء هذا المصروف المالي؟')) return;
+  const triggerCancelExpense = (expenseId) => {
     const target = expenses.find(ex => ex.id === expenseId);
-    if (target && updateExpense) {
-      updateExpense(expenseId, { status: 'ملغي' });
-      addAuditLog('إلغاء مصروف', `تم إلغاء مصروف بقيمة ${formatCurrency(target.amount)}: ${target.title}`, '⚠️');
-      showCelebration('تم إلغاء المصروف المالي! ⚠️');
+    if (!target) return;
+    setFinDeleteError('');
+    setFinDeleteModal({ open: true, type: 'expense', id: expenseId, item: target });
+  };
+
+  // Confirm delete/cancel handler
+  const handleConfirmFinancialCancel = async () => {
+    const { type, id, item } = finDeleteModal;
+    if (!item) return;
+    setFinDeleteLoading(true);
+    setFinDeleteError('');
+    try {
+      if (type === 'invoice') {
+        if (updateInvoice) {
+          await Promise.resolve(updateInvoice(id, { status: 'ملغاة' }));
+          addAuditLog('إلغاء فاتورة', `تم إلغاء الفاتورة رقم ${item.invoiceNumber} بقيمة ${formatCurrency(item.total)}`, '⚠️');
+          showCelebration('تم إلغاء الفاتورة! ⚠️');
+          if (selectedInvoice?.id === id) setSelectedInvoice(null);
+        }
+      } else if (type === 'payment') {
+        if (updatePayment) {
+          await Promise.resolve(updatePayment(id, { status: 'ملغي' }));
+          
+          // Refund invoice paid amount
+          const relatedInvoice = invoices.find(inv => inv.invoiceNumber === item.invoiceNumber);
+          if (relatedInvoice && updateInvoice) {
+            const newPaid = Math.max(0, (relatedInvoice.paid || 0) - item.amount);
+            await Promise.resolve(updateInvoice(relatedInvoice.id, {
+              paid: newPaid,
+              status: newPaid === 0 ? 'غير مدفوعة' : 'جزئي'
+            }));
+          }
+
+          addAuditLog('إلغاء دفعة', `تم إلغاء الدفعة بقيمة ${formatCurrency(item.amount)} للفاتورة ${item.invoiceNumber}`, '⚠️');
+          showCelebration('تم إلغاء الدفعة المالية! ⚠️');
+        }
+      } else if (type === 'expense') {
+        if (updateExpense) {
+          await Promise.resolve(updateExpense(id, { status: 'ملغي' }));
+          addAuditLog('إلغاء مصروف', `تم إلغاء مصروف بقيمة ${formatCurrency(item.amount)}: ${item.title}`, '⚠️');
+          showCelebration('تم إلغاء المصروف المالي! ⚠️');
+        }
+      }
+      setFinDeleteModal({ open: false, type: '', id: null, item: null });
+    } catch (err) {
+      setFinDeleteError('حدث خطأ أثناء تنفيذ العملية. يرجى المحاولة لاحقاً.');
+    } finally {
+      setFinDeleteLoading(false);
     }
   };
 
@@ -850,16 +879,18 @@ export const FinancialsView = () => {
                     <td style={{ padding: '12px' }}>{t.method}</td>
                     <td style={{ padding: '12px' }}>{t.clientName}</td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
-                      {!isCanceled ? (
+                      {!isCanceled && isSuper ? (
                         <button
                           type="button"
-                          onClick={() => t.type === 'in' ? handleCancelPayment(t.id) : handleCancelExpense(t.id)}
+                          onClick={() => t.type === 'in' ? triggerCancelPayment(t.id) : triggerCancelExpense(t.id)}
                           className="btn btn-secondary btn-sm"
                           style={{ color: '#ef4444', padding: '4px 8px', fontSize: '0.72rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}
                           title="إلغاء وتعديل الحركة"
                         >
                           إلغاء ❌
                         </button>
+                      ) : !isCanceled ? (
+                        <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>نشط</span>
                       ) : (
                         <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>ملغاة</span>
                       )}
@@ -922,14 +953,16 @@ export const FinancialsView = () => {
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       {isCanceled ? (
                         <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>ملغاة</span>
-                      ) : (
+                      ) : isSuper ? (
                         <button
-                          onClick={() => handleCancelExpense(ex.id)}
+                          onClick={() => triggerCancelExpense(ex.id)}
                           className="btn btn-secondary btn-sm"
                           style={{ padding: '3px 8px', color: 'var(--status-danger)' }}
                         >
                           إلغاء ❌
                         </button>
+                      ) : (
+                        <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>نشط</span>
                       )}
                     </td>
                   </tr>
@@ -1220,6 +1253,69 @@ export const FinancialsView = () => {
           </div>
         </div>
       </div>
+    );
+  };
+
+  // ─── Financial Delete Confirmation Modal render ───────────────────────────
+  const renderFinancialDeleteModal = () => {
+    if (!finDeleteModal.open || !finDeleteModal.item) return null;
+    const { type, item } = finDeleteModal;
+    
+    let title = '';
+    let description = '';
+    let itemDetails = [];
+    let warnings = [];
+    let confirmLabel = '';
+    
+    if (type === 'invoice') {
+      title = 'إلغاء الفاتورة';
+      description = `أنت على وشك إلغاء الفاتورة رقم "${item.invoiceNumber}" محاسبياً. سيتم الاحتفاظ ببيانات الفاتورة وتغيير حالتها إلى "ملغاة" دون حذفها نهائياً من قاعدة البيانات.`;
+      itemDetails = [
+        { label: 'رقم الفاتورة', value: item.invoiceNumber },
+        { label: 'العميل', value: item.clientName },
+        { label: 'تاريخ الإصدار', value: item.issueDate },
+        { label: 'الإجمالي النهائي', value: formatCurrency(item.total) },
+      ];
+      warnings = ['إلغاء الفاتورة سيجعلها غير قابلة للدفع أو التعديل، وستظهر كـ "ملغاة" في كشوف الحساب والتقارير.'];
+      confirmLabel = 'إلغاء الفاتورة محاسبياً';
+    } else if (type === 'payment') {
+      title = 'إلغاء عملية الدفع';
+      description = `هل أنت متأكد من إلغاء هذه العملية المالية؟ سيتم إدراجها كعملية "ملغاة" محاسبياً وسيتم خصم المبلغ من الرصيد المدفوع للفاتورة المرتبطة بها.`;
+      itemDetails = [
+        { label: 'رقم الفاتورة المرتبطة', value: item.invoiceNumber },
+        { label: 'العميل / الجهة', value: item.clientName },
+        { label: 'المبلغ المسترد', value: formatCurrency(item.amount) },
+        { label: 'طريقة الدفع', value: item.method },
+      ];
+      warnings = ['سيتم إنقاص المبلغ المدفوع من الفاتورة المعنية وتحديث حالة الفاتورة تلقائياً.'];
+      confirmLabel = 'تأكيد إلغاء الدفعة';
+    } else if (type === 'expense') {
+      title = 'إلغاء المصروف المالي';
+      description = `أنت على وشك إلغاء مصروف مالي. سيتم تحديث حالة المصروف إلى "ملغي" دون حذفه نهائياً من السجل المالي لأغراض المراجعة والمطابقة المالية.`;
+      itemDetails = [
+        { label: 'بيان المصروف', value: item.title },
+        { label: 'التصنيف', value: item.category },
+        { label: 'المبلغ', value: formatCurrency(item.amount) },
+        { label: 'المستلم', value: item.recipient || '-' },
+      ];
+      warnings = ['سيتم استبعاد هذا المصروف من مجاميع الأرباح والخسائر والتقارير المالية النشطة.'];
+      confirmLabel = 'تأكيد إلغاء المصروف';
+    }
+
+    return (
+      <ConfirmDeleteModal
+        isOpen={true}
+        onClose={() => setFinDeleteModal({ open: false, type: '', id: null, item: null })}
+        onConfirm={handleConfirmFinancialCancel}
+        title={title}
+        description={description}
+        itemDetails={itemDetails}
+        warnings={warnings}
+        confirmLabel={confirmLabel}
+        confirmVariant="warning"
+        isLoading={finDeleteLoading}
+        errorMsg={finDeleteError}
+      />
     );
   };
 
@@ -1654,7 +1750,7 @@ export const FinancialsView = () => {
 
               <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', padding: '12px 16px', display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  {selectedInvoice.status !== 'ملغاة' && (
+                  {selectedInvoice.status !== 'ملغاة' && isSuper && (
                     <>
                       <button 
                         type="button" 
@@ -1669,7 +1765,7 @@ export const FinancialsView = () => {
                       </button>
                       <button 
                         type="button" 
-                        onClick={() => handleCancelInvoice(selectedInvoice.id)} 
+                        onClick={() => triggerCancelInvoice(selectedInvoice.id)} 
                         className="btn btn-secondary"
                         style={{ color: '#ef4444', fontSize: '0.8rem' }}
                       >
@@ -2397,6 +2493,8 @@ export const FinancialsView = () => {
         </div>
       )}
 
+      {/* Financial Confirm Delete/Cancel Modal */}
+      {renderFinancialDeleteModal && renderFinancialDeleteModal()}
     </div>
   );
 };

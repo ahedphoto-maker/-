@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatCurrency, formatBookingNumber } from '../../utils/helpers';
 import * as Icons from 'lucide-react';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal';
 
 export const ClientsView = () => {
   const {
     clients,
     addClient,
     updateClient,
+    deleteClient,
     bookings,
     invoices,
     payments,
@@ -17,8 +19,11 @@ export const ClientsView = () => {
     addPayment,
     setSelectedBooking,
     setIsBookingDetailOpen,
-    setIsBookingFormOpen
+    setIsBookingFormOpen,
+    userRole
   } = useApp();
+
+  const isAdmin = userRole === 'admin';
 
   const [isAddClientOpen, setIsAddClientOpen] = useState(false);
   const [newClient, setNewClient] = useState({
@@ -59,7 +64,7 @@ export const ClientsView = () => {
 
   // Statement dialog
   const [isStatementOpen, setIsStatementOpen] = useState(false);
-  const [statementPeriod, setStatementPeriod] = useState('all'); // 'this_month' | 'last_month' | 'this_year' | 'all' | 'custom'
+  const [statementPeriod, setStatementPeriod] = useState('all');
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
 
@@ -69,6 +74,35 @@ export const ClientsView = () => {
   // Client files input helper
   const [newFileName, setNewFileName] = useState('');
   const [newFileType, setNewFileType] = useState('PDF');
+
+  // ─── Delete Client State ─────────────────────────────────────────────────────
+  const [deleteModal, setDeleteModal] = useState({ open: false, client: null });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+
+  const handleDeleteClientClick = (e, client) => {
+    e.stopPropagation(); // prevent opening profile
+    setDeleteError('');
+    setDeleteModal({ open: true, client });
+  };
+
+  const handleDeleteClientConfirm = async () => {
+    if (!deleteModal.client) return;
+    setDeleteLoading(true);
+    setDeleteError('');
+    try {
+      await deleteClient(deleteModal.client.id);
+      setDeleteModal({ open: false, client: null });
+      // If currently viewing the deleted client's profile, go back to list
+      if (selectedClientProfile?.id === deleteModal.client.id) {
+        setSelectedClientProfile(null);
+      }
+    } catch (err) {
+      setDeleteError('فشل الحذف. يرجى المحاولة مرة أخرى أو التواصل مع الدعم التقني.');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   const todayStr = new Date().toISOString().substring(0, 10);
 
@@ -370,8 +404,8 @@ export const ClientsView = () => {
           <hr />
         </div>
 
-        {/* Back button */}
-        <div className="no-print">
+        {/* Back button + Delete button */}
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <button
             onClick={() => setSelectedClientProfile(null)}
             className="btn btn-secondary btn-sm"
@@ -380,6 +414,25 @@ export const ClientsView = () => {
             <Icons.ArrowRight size={14} />
             <span>العودة إلى دليل العملاء</span>
           </button>
+
+          {isAdmin && (
+            <button
+              onClick={(e) => handleDeleteClientClick(e, selectedClientProfile)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                fontSize: '0.78rem', height: '32px', padding: '0 14px',
+                borderRadius: '8px', border: '1px solid #ef4444',
+                backgroundColor: 'rgba(239,68,68,0.08)', color: '#ef4444',
+                cursor: 'pointer', fontWeight: 700, transition: 'all 0.15s'
+              }}
+              onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#ef4444'; e.currentTarget.style.color = '#fff'; }}
+              onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.08)'; e.currentTarget.style.color = '#ef4444'; }}
+              title="حذف هذا العميل"
+            >
+              <Icons.Trash2 size={14} />
+              <span>حذف العميل</span>
+            </button>
+          )}
         </div>
 
         {/* 1. Client Premium Card Header */}
@@ -1237,7 +1290,8 @@ export const ClientsView = () => {
                   padding: '12px 14px',
                   borderRadius: '12px',
                   borderRight: '4px solid var(--primary-color)',
-                  transition: 'all 0.15s ease'
+                  transition: 'all 0.15s ease',
+                  position: 'relative'
                 }}
                 onMouseEnter={e => {
                   e.currentTarget.style.transform = 'translateY(-2px)';
@@ -1267,6 +1321,25 @@ export const ClientsView = () => {
                         ⚠️ خامل
                       </span>
                     )}
+                    {/* Admin-only delete button */}
+                    {isAdmin && (
+                      <button
+                        onClick={(e) => handleDeleteClientClick(e, c)}
+                        style={{
+                          width: '28px', height: '28px', borderRadius: '7px',
+                          border: '1px solid rgba(239,68,68,0.3)',
+                          backgroundColor: 'rgba(239,68,68,0.07)',
+                          color: '#ef4444', cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          transition: 'all 0.15s', flexShrink: 0
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = '#ef4444'; e.currentTarget.style.color = '#fff'; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = 'rgba(239,68,68,0.07)'; e.currentTarget.style.color = '#ef4444'; }}
+                        title="حذف العميل"
+                      >
+                        <Icons.Trash2 size={13} />
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -1290,6 +1363,45 @@ export const ClientsView = () => {
           })
         )}
       </div>
+
+      {/* MODAL: Confirm Delete Client */}
+      {deleteModal.open && deleteModal.client && (() => {
+        const relatedBookings = bookings?.filter(b =>
+          b.clientId === deleteModal.client.id ||
+          (b.bookingType === 'client' && b.clientName === deleteModal.client.name)
+        ) || [];
+        const relatedInvoices = invoices?.filter(inv =>
+          inv.clientName === deleteModal.client.name ||
+          inv.clientEmail === deleteModal.client.email
+        ) || [];
+        const warnings = [];
+        if (relatedBookings.length > 0) {
+          warnings.push(`هذا العميل لديه ${relatedBookings.length} حجز/حجوزات مرتبطة به. سيتم حذف بيانات العميل فقط، وستظل الحجوزات موجودة في النظام.`);
+        }
+        if (relatedInvoices.length > 0) {
+          warnings.push(`يوجد ${relatedInvoices.length} فاتورة/فواتير مرتبطة بهذا العميل. ستظل الفواتير محفوظة في السجل المالي.`);
+        }
+        return (
+          <ConfirmDeleteModal
+            isOpen={true}
+            onClose={() => { setDeleteModal({ open: false, client: null }); setDeleteError(''); }}
+            onConfirm={handleDeleteClientConfirm}
+            title="حذف العميل"
+            description={`هل أنت متأكد من حذف العميل "${deleteModal.client.name}" بشكل نهائي؟ لا يمكن التراجع عن هذه العملية.`}
+            itemDetails={[
+              { label: 'اسم العميل', value: deleteModal.client.name },
+              { label: 'رقم الجوال', value: deleteModal.client.phone || '-' },
+              { label: 'النوع', value: deleteModal.client.type || '-' },
+              { label: 'عدد الحجوزات المرتبطة', value: relatedBookings.length },
+            ]}
+            warnings={warnings}
+            confirmLabel="حذف العميل نهائياً"
+            confirmVariant="danger"
+            isLoading={deleteLoading}
+            errorMsg={deleteError}
+          />
+        );
+      })()}
 
       {/* MODAL: Add Client */}
       {isAddClientOpen && (

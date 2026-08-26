@@ -723,6 +723,19 @@ export const AppProvider = ({ children }) => {
     }
   }, [clients, logFirestoreOp]);
 
+  const deleteClient = useCallback((clientId) => {
+    const target = clients.find(c => c.id === Number(clientId));
+    if (!target) return Promise.reject(new Error('العميل غير موجود'));
+    return logFirestoreOp('deleteDoc', 'clients', String(clientId), () =>
+      deleteDoc(doc(db, 'clients', String(clientId)))
+    ).then(() => {
+      addAuditLog('حذف عميل', `تم حذف العميل: ${target.name} (ID: ${clientId})`, '🗑️');
+    }).catch(err => {
+      console.warn('deleteClient error:', err);
+      throw err;
+    });
+  }, [clients, addAuditLog, logFirestoreOp]);
+
   // Freelancers CRUD
   const addFreelancer = useCallback((freelancerData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(freelancerData);
@@ -745,6 +758,16 @@ export const AppProvider = ({ children }) => {
       logFirestoreOp('setDoc', 'freelancers', String(freelancerId), () => setDoc(doc(db, 'freelancers', String(freelancerId)), merged)).catch(err => console.warn('updateFreelancer error:', err));
     }
   }, [freelancers, logFirestoreOp]);
+
+  const deleteFreelancer = useCallback((freelancerId) => {
+    const target = freelancers.find(f => f.id === Number(freelancerId));
+    if (!target) return Promise.reject(new Error('المصور غير موجود'));
+    return logFirestoreOp('deleteDoc', 'freelancers', String(freelancerId), () =>
+      deleteDoc(doc(db, 'freelancers', String(freelancerId)))
+    ).then(() => {
+      addAuditLog('حذف مصور فريلانسر', `تم حذف الفريلانسر: ${target.name} (ID: ${freelancerId})`, '🗑️');
+    }).catch(err => { console.warn('deleteFreelancer error:', err); throw err; });
+  }, [freelancers, addAuditLog, logFirestoreOp]);
 
   // Equipment actions
   const updateEquipment = useCallback((equipmentId, updatedFields) => {
@@ -849,6 +872,18 @@ export const AppProvider = ({ children }) => {
     }
   }, [invoices, logFirestoreOp]);
 
+  // Archive (cancel) invoice - never hard-delete to preserve financial history
+  const cancelInvoice = useCallback((invoiceId) => {
+    const target = invoices.find(inv => inv.id === Number(invoiceId));
+    if (!target) return Promise.reject(new Error('الفاتورة غير موجودة'));
+    const archived = { ...target, status: 'ملغاة', cancelledAt: new Date().toISOString(), cancelledBy: currentUser?.name || 'مشرف' };
+    return logFirestoreOp('setDoc', 'invoices', String(invoiceId), () =>
+      setDoc(doc(db, 'invoices', String(invoiceId)), archived)
+    ).then(() => {
+      addAuditLog('إلغاء فاتورة', `تم إلغاء الفاتورة رقم ${target.invoiceNumber || invoiceId} بقيمة ${target.total || 0} ريال`, '🗑️');
+    }).catch(err => { console.warn('cancelInvoice error:', err); throw err; });
+  }, [invoices, currentUser, addAuditLog, logFirestoreOp]);
+
   const addPayment = useCallback((paymentData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(paymentData);
     const newPayment = {
@@ -860,6 +895,18 @@ export const AppProvider = ({ children }) => {
     showCelebration('تم تسجيل الدفعة المالية بنجاح! 💰');
   }, [addAuditLog, logFirestoreOp]);
 
+  // Reverse a payment (admin only) — never hard-delete financial records
+  const cancelPayment = useCallback((paymentId) => {
+    const target = payments.find(p => p.id === Number(paymentId));
+    if (!target) return Promise.reject(new Error('الدفعة غير موجودة'));
+    const reversed = { ...target, status: 'ملغاة', reversedAt: new Date().toISOString(), reversedBy: currentUser?.name || 'مشرف' };
+    return logFirestoreOp('setDoc', 'payments', String(paymentId), () =>
+      setDoc(doc(db, 'payments', String(paymentId)), reversed)
+    ).then(() => {
+      addAuditLog('عكس دفعة مالية', `تم عكس دفعة بقيمة ${target.amount || 0} ريال للعميل ${target.clientName || ''}`, '↩️');
+    }).catch(err => { console.warn('cancelPayment error:', err); throw err; });
+  }, [payments, currentUser, addAuditLog, logFirestoreOp]);
+
   const addExpense = useCallback((expenseData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(expenseData);
     const newExpense = {
@@ -869,6 +916,17 @@ export const AppProvider = ({ children }) => {
     logFirestoreOp('setDoc', 'expenses', String(newExpense.id), () => setDoc(doc(db, 'expenses', String(newExpense.id)), newExpense)).catch(err => console.warn('addExpense error:', err));
     addAuditLog('تسجيل مصروفات', `تم تسجيل مصروف بقيمة ${sanitizedData.amount} ريال`, '💸');
   }, [addAuditLog, logFirestoreOp]);
+
+  // Delete or cancel an expense
+  const deleteExpense = useCallback((expenseId) => {
+    const target = expenses.find(ex => ex.id === Number(expenseId));
+    if (!target) return Promise.reject(new Error('المصروف غير موجود'));
+    return logFirestoreOp('deleteDoc', 'expenses', String(expenseId), () =>
+      deleteDoc(doc(db, 'expenses', String(expenseId)))
+    ).then(() => {
+      addAuditLog('حذف مصروف', `تم حذف المصروف: ${target.description || target.category || ''} بقيمة ${target.amount || 0} ريال`, '🗑️');
+    }).catch(err => { console.warn('deleteExpense error:', err); throw err; });
+  }, [expenses, addAuditLog, logFirestoreOp]);
 
   const updatePayment = useCallback((paymentId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
@@ -1196,13 +1254,18 @@ export const AppProvider = ({ children }) => {
         completeTask,
         addClient,
         updateClient,
+        deleteClient,
         addFreelancer,
         updateFreelancer,
+        deleteFreelancer,
         updateEquipment,
         addInvoice,
         updateInvoice,
+        cancelInvoice,
         addPayment,
+        cancelPayment,
         addExpense,
+        deleteExpense,
         updatePayment,
         updateExpense,
         updateSettings,
