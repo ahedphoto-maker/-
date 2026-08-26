@@ -23,21 +23,34 @@ service cloud.firestore {
       );
     }
 
-    // Rules for Bookings collection
-    match /bookings/{bookingId} {
-      // Allow single booking read for any authenticated user (supporting client portal)
-      allow get: if isAuthenticated();
-      // Allow query/list and write operations only for logged-in team members
-      allow list, write: if isTeamMember();
+    // Helper: Prevent mock data seeding by blocking small numeric IDs in operational tables
+    function isValidId(id) {
+      return !id.matches('^[0-9]+$') || int(id) >= 100000;
     }
 
-    // Rules for Team collection
+    // Rules for Bookings collection (special read permission)
+    match /bookings/{bookingId} {
+      allow get: if isAuthenticated();
+      allow list, write: if isTeamMember() && isValidId(bookingId);
+    }
+
+    // Rules for Team collection (structural)
     match /team/{memberId} {
-      allow read: if isAuthenticated(); // Allow reading team list for the login selector
+      allow read: if isAuthenticated();
       allow write: if isTeamMember();
     }
 
-    // Rules for Devices collection
+    // Rules for customRoles collection (structural)
+    match /customRoles/{roleId} {
+      allow read, write: if isTeamMember();
+    }
+
+    // Rules for equipment collection (structural)
+    match /equipment/{equipmentId} {
+      allow read, write: if isTeamMember();
+    }
+
+    // Rules for Devices collection (special access)
     match /devices/{deviceId} {
       allow read, write: if isAuthenticated() && (
         request.auth.uid == (resource != null ? resource.data.userId : request.resource.data.userId) ||
@@ -45,15 +58,15 @@ service cloud.firestore {
       );
     }
 
-    // Rules for Settings collection
+    // Rules for Settings collection (admin only write)
     match /settings/{settingId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    // Default fallback rule for all other collections
-    match /{document=**} {
-      allow read, write: if isTeamMember();
+    // Default fallback for operational collections (clients, projects, invoices, expenses, etc.)
+    match /{collectionName}/{docId} {
+      allow read, write: if isTeamMember() && isValidId(docId);
     }
   }
 }
