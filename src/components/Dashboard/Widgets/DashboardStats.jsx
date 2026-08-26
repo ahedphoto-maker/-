@@ -47,16 +47,6 @@ export const DashboardStats = memo(({ bookingsCount, tasksCount, activeProjectsC
         />
       </div>
 
-      <div onClick={() => handleCardClick('invoices', '/admin/invoices')} style={{ cursor: 'pointer' }}>
-        <StatCard
-          title="إجمالي الإيرادات"
-          value={`${(totalRevenue || 0).toLocaleString('en-US')} ريال`}
-          change="+18% مقارنة بالشهر السابق"
-          isPositive={true}
-          icon={Icons.TrendingUp}
-          color="success"
-        />
-      </div>
     </div>
   );
 });

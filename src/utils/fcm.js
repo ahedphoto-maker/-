@@ -1,6 +1,6 @@
 import { getMessaging, getToken, isSupported } from 'firebase/messaging';
 import { doc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+import { db, auth } from '../firebase';
 
 // VAPID Public Key from Firebase Console (Web configuration)
 // Can be overridden in production using environment variables
@@ -86,7 +86,7 @@ export async function registerDeviceToken(currentUser) {
     const deviceId = getOrCreateDeviceId();
     const details = getDeviceDetails();
 
-    const authUid = currentUser.uid || currentUser.email || `user_${currentUser.id}`;
+    const authUid = auth.currentUser?.uid || currentUser.uid || currentUser.email || `user_${currentUser.id}`;
     const docId = `${authUid}_${deviceId}`;
     const deviceRef = doc(db, 'devices', docId);
 
@@ -120,7 +120,7 @@ export async function unregisterDeviceToken(currentUser) {
   if (!currentUser) return;
   try {
     const deviceId = getOrCreateDeviceId();
-    const authUid = currentUser.uid || currentUser.email || `user_${currentUser.id}`;
+    const authUid = auth.currentUser?.uid || currentUser.uid || currentUser.email || `user_${currentUser.id}`;
     const docId = `${authUid}_${deviceId}`;
     const deviceRef = doc(db, 'devices', docId);
 

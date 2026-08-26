@@ -29,15 +29,12 @@ const db = admin.firestore();
 // Derive user role (admin/employee)
 function deriveUserRole(member) {
   if (!member) return null;
-  const email = (member.email || '').toLowerCase().trim();
   const role = (member.role || '').toLowerCase();
   
   if (
     member.id === 1 || 
     member.isSupervisor || 
-    email === 'ahdalamary@gmail.com' || 
-    email === 'ahed@lensflow.sa' || 
-    email === 'admin@lensflow.sa' || 
+    member.uid === 'exGmtjCKN9ZKa3HvmoGxiCZH3O63' || // Admin UID
     role.includes('مدير') || 
     role.includes('مشرف')
   ) {
@@ -53,15 +50,12 @@ async function getSupervisors() {
   
   teamSnap.forEach(doc => {
     const data = doc.data();
-    const email = (data.email || '').toLowerCase().trim();
     const role = (data.role || '').toLowerCase();
     
     if (
       data.id === 1 || 
       data.isSupervisor || 
-      email === 'ahdalamary@gmail.com' || 
-      email === 'ahed@lensflow.sa' || 
-      email === 'admin@lensflow.sa' || 
+      data.uid === 'exGmtjCKN9ZKa3HvmoGxiCZH3O63' || // Admin UID
       role.includes('مدير') || 
       role.includes('مشرف')
     ) {

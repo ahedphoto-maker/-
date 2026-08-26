@@ -90,32 +90,42 @@ export const BookingsMap = () => {
 
   // Active bookings filter (excluding cancelled bookings)
   const activeBookings = useMemo(() => {
-    return bookings ? bookings.filter(b => b.status !== 'ملغي') : [];
+    return bookings ? bookings.filter(b => b && b.status !== 'ملغي') : [];
   }, [bookings]);
 
   // Unique photographers for filtering dropdown
   const activePhotographers = useMemo(() => {
     if (!team) return [];
     // Only return team members who have bookings assigned
-    const assignedIds = new Set(activeBookings.flatMap(b => b.teamAssigned || []));
-    return team.filter(m => assignedIds.has(m.id));
+    const assignedIds = new Set(
+      activeBookings.flatMap(b => 
+        Array.isArray(b.teamAssigned)
+          ? b.teamAssigned
+          : (b.teamAssigned ? [b.teamAssigned] : [])
+      )
+    );
+    return team.filter(m => m && assignedIds.has(m.id));
   }, [team, activeBookings]);
 
   // Statistics for Sidebar
   const stats = useMemo(() => {
     const total = activeBookings.length;
-    const active = activeBookings.filter(b => b.status === 'قيد التنفيذ').length;
-    const completed = activeBookings.filter(b => b.status === 'مكتمل' || b.status === 'مكتملة').length;
+    const active = activeBookings.filter(b => b && b.status === 'قيد التنفيذ').length;
+    const completed = activeBookings.filter(b => b && (b.status === 'مكتمل' || b.status === 'مكتملة')).length;
     
     // Count photographers currently active in fields
     const activePhotographerIds = new Set(
       activeBookings
-        .filter(b => b.status === 'قيد التنفيذ')
-        .flatMap(b => b.teamAssigned || [])
+        .filter(b => b && b.status === 'قيد التنفيذ')
+        .flatMap(b => 
+          Array.isArray(b.teamAssigned)
+            ? b.teamAssigned
+            : (b.teamAssigned ? [b.teamAssigned] : [])
+        )
     );
     const photographersInField = activePhotographerIds.size;
 
-    const upcoming = activeBookings.filter(b => b.status === 'مؤكد' || b.status === 'بانتظار العميل').length;
+    const upcoming = activeBookings.filter(b => b && (b.status === 'مؤكد' || b.status === 'بانتظار العميل')).length;
 
     return { total, active, completed, photographersInField, upcoming };
   }, [activeBookings]);
@@ -124,14 +134,18 @@ export const BookingsMap = () => {
   const filteredBookings = useMemo(() => {
     return activeBookings.filter(b => {
       const coverageStatus = getCoverageStatus(b);
-      const assignedIds = b.teamAssigned || [];
+      const assignedIds = Array.isArray(b.teamAssigned)
+        ? b.teamAssigned
+        : (b.teamAssigned ? [b.teamAssigned] : []);
       
       // Search text filter
+      const q = searchQuery.toLowerCase();
       const matchesSearch = 
-        b.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (b.clientName && b.clientName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (b.location && b.location.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        b.bookingNumber.toLowerCase().includes(searchQuery.toLowerCase()) || formatBookingNumber(b.bookingNumber).includes(searchQuery);
+        (b.title && String(b.title).toLowerCase().includes(q)) ||
+        (b.clientName && String(b.clientName).toLowerCase().includes(q)) ||
+        (b.location && String(b.location).toLowerCase().includes(q)) ||
+        (b.bookingNumber && String(b.bookingNumber).toLowerCase().includes(q)) || 
+        (b.bookingNumber && formatBookingNumber(b.bookingNumber).includes(searchQuery));
 
       // Status filter
       const matchesStatus = statusFilter === 'الكل' || coverageStatus === statusFilter;
@@ -205,7 +219,8 @@ export const BookingsMap = () => {
       const [lat, lng] = getBookingCoords(b);
       const status = getCoverageStatus(b);
       const color = getStatusColor(status);
-      const titleShort = b.title.length > 20 ? `${b.title.substring(0, 18)}...` : b.title;
+      const title = b.title || '';
+      const titleShort = title.length > 20 ? `${title.substring(0, 18)}...` : title;
 
       // Custom Glowing Pulsing Marker HTML
       const markerHtml = `
@@ -276,7 +291,10 @@ export const BookingsMap = () => {
       const marker = L.marker([lat, lng], { icon: customIcon }).addTo(mapRef.current);
       
       marker.on('click', () => {
-        const assignedPhotographer = team && b.teamAssigned && team.find(t => b.teamAssigned.includes(t.id));
+        const teamAssignedArr = Array.isArray(b.teamAssigned)
+          ? b.teamAssigned
+          : (b.teamAssigned ? [b.teamAssigned] : []);
+        const assignedPhotographer = team && team.find(t => teamAssignedArr.includes(t.id));
         setSelectedPin({
           b,
           status,
@@ -301,7 +319,10 @@ export const BookingsMap = () => {
   const handleSelectBookingFromList = (booking) => {
     const coords = getBookingCoords(booking);
     const status = getCoverageStatus(booking);
-    const assignedPhotographer = team && booking.teamAssigned && team.find(t => booking.teamAssigned.includes(t.id));
+    const teamAssignedArr = Array.isArray(booking.teamAssigned)
+      ? booking.teamAssigned
+      : (booking.teamAssigned ? [booking.teamAssigned] : []);
+    const assignedPhotographer = team && team.find(t => teamAssignedArr.includes(t.id));
 
     setSelectedPin({
       b: booking,
@@ -577,7 +598,13 @@ export const BookingsMap = () => {
                   </div>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <Icons.Clock size={14} color="#f59e0b" />
-                    <span><strong>التوقيت:</strong> {selectedPin.b.isAllDay ? 'طوال اليوم' : (selectedPin.b.startTime === 'صباحًا' || selectedPin.b.startTime === 'مساءً' ? selectedPin.b.startTime : `${formatTime12h(selectedPin.b.startTime)} - ${formatTime12h(selectedPin.b.endTime)}`)}</span>
+                    <span><strong>التوقيت:</strong> {(() => {
+                      const b = selectedPin.b;
+                      if (b.isAllDay) return 'طوال اليوم';
+                      if (!b.startTime) return 'غير محدد';
+                      if (b.startTime === 'صباحًا' || b.startTime === 'مساءً') return b.startTime;
+                      return `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`;
+                    })()}</span>
                   </div>
                   <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
                     <Icons.Camera size={14} color="#8b5cf6" />
@@ -896,10 +923,15 @@ const SidebarContent = ({
 
                 {/* Details preview */}
                 <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                  <span>📍 {b.location.split(' - ')[0]}</span>
+                  <span>📍 {(b.location || '').split(' - ')[0]}</span>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '2px' }}>
                     <span className="en-digits">📅 {b.date || b.startDate}</span>
-                    <span className="en-digits">🕒 {b.isAllDay ? 'طوال اليوم' : (b.startTime === 'صباحًا' || b.startTime === 'مساءً' ? b.startTime : `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`)}</span>
+                    <span className="en-digits">🕒 {(() => {
+                      if (b.isAllDay) return 'طوال اليوم';
+                      if (!b.startTime) return 'غير محدد';
+                      if (b.startTime === 'صباحًا' || b.startTime === 'مساءً') return b.startTime;
+                      return `${formatTime12h(b.startTime)} - ${formatTime12h(b.endTime)}`;
+                    })()}</span>
                   </div>
                 </div>
               </div>

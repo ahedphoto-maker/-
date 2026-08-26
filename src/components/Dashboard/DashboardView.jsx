@@ -247,66 +247,15 @@ export const DashboardView = () => {
         )}
       </div>
 
-      {/* 🌟 STATS GRID SECTION: إحصائيات شبكة 2×2 على الجوال */}
+      {/* 🌟 STATS GRID SECTION: إحصائيات شبكة 3 أعمدة */}
       <div 
         style={{ 
           display: 'grid', 
-          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', 
+          gridTemplateColumns: isMobile ? 'repeat(1, 1fr)' : 'repeat(3, 1fr)', 
           gap: '12px',
           width: '100%'
         }}
       >
-        {/* Stat 1: Revenue */}
-        <div style={{
-          background: 'linear-gradient(135deg, rgba(244, 63, 94, 0.03) 0%, var(--bg-card) 100%)',
-          border: '1px solid var(--border-color)',
-          borderRadius: '16px',
-          padding: isMobile ? '12px' : '18px 20px',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '12px',
-          boxShadow: 'var(--card-shadow)',
-          backdropFilter: 'blur(10px)'
-        }}>
-          <div style={{ width: '40px', height: '40px', borderRadius: '12px', backgroundColor: 'rgba(244, 63, 94, 0.12)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <Icons.Coins size={20} color="#f43f5e" />
-          </div>
-          <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>الإيرادات</span>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  togglePrivacyMode();
-                }}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  padding: '2px',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: 'var(--text-muted)',
-                  opacity: 0.6,
-                  transition: 'opacity 0.2s',
-                  outline: 'none',
-                  margin: 0
-                }}
-                onMouseEnter={(e) => e.currentTarget.style.opacity = 1}
-                onMouseLeave={(e) => e.currentTarget.style.opacity = 0.6}
-                title={privacyMode ? "إظهار المبالغ" : "إخفاء المبالغ"}
-              >
-                {privacyMode ? <Icons.EyeOff size={13} /> : <Icons.Eye size={13} />}
-              </button>
-            </div>
-            <strong className="en-digits" style={{ fontSize: isMobile ? '1.1rem' : '1.35rem', fontWeight: 900, color: 'var(--text-main)', display: 'block', marginTop: '2px' }}>
-              {privacyMode ? '••••••' : formatCurrency(totalRevenue).replace(' ريال', '')}
-              <span style={{ fontSize: isMobile ? '0.72rem' : '0.82rem', fontWeight: 500, color: 'var(--text-muted)', marginRight: '4px' }}>ريال</span>
-            </strong>
-            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)', display: 'block', marginTop: '1px' }}>إجمالي الدخل</span>
-          </div>
-        </div>
 
         {/* Stat 2: Bookings */}
         <div style={{
@@ -648,11 +597,7 @@ export const DashboardView = () => {
                               </span>
                             )}
                           </div>
-                          {b.totalPrice !== null && !privacyMode && (
-                            <span className="en-digits" style={{ fontSize: '0.78rem', fontWeight: 800, color: remaining > 0 ? 'var(--status-danger)' : 'var(--status-success)' }}>
-                              {remaining > 0 ? `متبقي: ${formatCurrency(remaining).replace(' ريال', '')} ريال` : 'مدفوع بالكامل'}
-                            </span>
-                          )}
+
                         </div>
 
                         {/* Title and details */}
@@ -830,11 +775,7 @@ export const DashboardView = () => {
                               </span>
                             )}
                           </div>
-                          {b.totalPrice !== null && !privacyMode && (
-                            <span className="en-digits" style={{ fontSize: '0.78rem', fontWeight: 800, color: remaining > 0 ? 'var(--status-danger)' : 'var(--status-success)', marginRight: isImportant ? '80px' : '0' }}>
-                              {remaining > 0 ? `متبقي: ${formatCurrency(remaining).replace(' ريال', '')} ريال` : 'مدفوع بالكامل'}
-                            </span>
-                          )}
+
                         </div>
 
                         {/* Title and details */}

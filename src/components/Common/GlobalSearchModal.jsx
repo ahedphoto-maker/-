@@ -23,9 +23,9 @@ export const GlobalSearchModal = () => {
 
   const query = searchQuery.trim().toLowerCase();
 
-  const filteredBookings = query ? bookings.filter(b => b.title.toLowerCase().includes(query) || b.clientName.toLowerCase().includes(query) || b.bookingNumber.toLowerCase().includes(query) || formatBookingNumber(b.bookingNumber).includes(query)) : [];
-  const filteredClients = query ? clients.filter(c => c.name.toLowerCase().includes(query) || c.contactPerson.toLowerCase().includes(query)) : [];
-  const filteredEquipment = query ? equipment.filter(e => e.name.toLowerCase().includes(query) || e.category.toLowerCase().includes(query)) : [];
+  const filteredBookings = query ? bookings.filter(b => (b.title || '').toLowerCase().includes(query) || (b.clientName || '').toLowerCase().includes(query) || (b.bookingNumber || '').toLowerCase().includes(query) || formatBookingNumber(b.bookingNumber).includes(query)) : [];
+  const filteredClients = query ? clients.filter(c => (c.name || '').toLowerCase().includes(query) || (c.contactPerson || '').toLowerCase().includes(query)) : [];
+  const filteredEquipment = query ? equipment.filter(e => (e.name || '').toLowerCase().includes(query) || (e.category || '').toLowerCase().includes(query)) : [];
 
   return (
     <div

@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import * as Icons from 'lucide-react';
 import { navigateTo } from '../../routes/Router';
-import { auth } from '../../firebase';
+import { auth, db } from '../../firebase';
 import { signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
 
 export const LoginScreen = ({ onLogin }) => {
   const { team, loginUser } = useApp();
@@ -31,28 +32,47 @@ export const LoginScreen = ({ onLogin }) => {
       return;
     }
 
-    // Check if the user exists in our local team list
-    const foundMember = team.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail) || 
-      ( (cleanEmail === 'ahdalamary@gmail.com' || cleanEmail === 'ahed@lensflow.sa' || cleanEmail === 'admin@lensflow.sa') ? {
-        id: 1,
-        name: 'عاهد العماري',
-        role: 'مصور فريلانسر / منظم حجوزاتي العهد ستار 👑',
-        email: 'ahdalamary@gmail.com',
-        avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
-        isSupervisor: true
-      } : null );
-
-    if (!foundMember) {
-      setIsLoading(false);
-      setError('❌ لم يتم العثور على بريد إلكتروني مسجل كعضو في الفريق. يرجى مراجعة مدير الاستوديو.');
-      return;
-    }
-
     try {
-      // 1. Try signing in using Firebase Auth
-      await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-      console.log("Logged in to Firebase Auth successfully as:", cleanEmail);
+      // 1. Try signing in using Firebase Auth first
+      const userCredential = await signInWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+      const firebaseUser = userCredential.user;
+      console.log("Logged in to Firebase Auth successfully as:", cleanEmail, "UID:", firebaseUser.uid);
       
+      // 2. Find the team member by UID first, then by email
+      let foundMember = team.find(m => m.uid === firebaseUser.uid) || 
+                         team.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail);
+
+      // Fallback for admin user hardcoding
+      if (!foundMember && (cleanEmail === 'ahdalamary@gmail.com' || cleanEmail === 'ahed@lensflow.sa' || cleanEmail === 'admin@lensflow.sa')) {
+        foundMember = {
+          id: 1,
+          name: 'عاهد العماري',
+          role: 'مصور فريلانسر / منظم حجوزاتي العهد ستار 👑',
+          email: cleanEmail,
+          avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+          isSupervisor: true
+        };
+      }
+
+      if (!foundMember) {
+        setIsLoading(false);
+        setError('❌ لم يتم العثور على بريد إلكتروني مسجل كعضو في الفريق. يرجى مراجعة مدير الاستوديو.');
+        await auth.signOut();
+        return;
+      }
+
+      // Update UID and email in Firestore dynamically if needed
+      if (foundMember.uid !== firebaseUser.uid || foundMember.email !== cleanEmail) {
+        const memberDocRef = doc(db, 'team', String(foundMember.id));
+        await setDoc(memberDocRef, { 
+          uid: firebaseUser.uid,
+          email: cleanEmail 
+        }, { merge: true });
+        console.log(`Updated team member ${foundMember.name} profile with UID and email in Firestore.`);
+        foundMember.uid = firebaseUser.uid;
+        foundMember.email = cleanEmail;
+      }
+
       if (loginUser) loginUser(foundMember);
       setIsLoading(false);
       if (onLogin) onLogin(foundMember);
@@ -66,13 +86,34 @@ export const LoginScreen = ({ onLogin }) => {
     } catch (err) {
       console.warn("Firebase Auth login failed:", err.code, err.message);
       
-      // 2. Auto-register if the error is user-not-found or invalid-credential (since we verified they are on the team)
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') {
+      // 2. Auto-register if the error is user-not-found (since we verified they are on the team)
+      const isTeamEmail = team.some(m => m.email && m.email.toLowerCase().trim() === cleanEmail) || 
+                          (cleanEmail === 'ahdalamary@gmail.com' || cleanEmail === 'ahed@lensflow.sa' || cleanEmail === 'admin@lensflow.sa');
+
+      if ((err.code === 'auth/user-not-found' || err.code === 'auth/invalid-credential') && isTeamEmail) {
         try {
           console.log("User not found in Firebase. Attempting auto-registration for team member:", cleanEmail);
-          await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
-          console.log("Firebase Auth user registered successfully:", cleanEmail);
+          const userCredential = await createUserWithEmailAndPassword(auth, cleanEmail, cleanPassword);
+          const firebaseUser = userCredential.user;
+          console.log("Firebase Auth user registered successfully:", cleanEmail, "UID:", firebaseUser.uid);
           
+          let foundMember = team.find(m => m.email && m.email.toLowerCase().trim() === cleanEmail) || {
+            id: 1,
+            name: 'عاهد العماري',
+            role: 'مصور فريلانسر / منظم حجوزاتي العهد ستار 👑',
+            email: cleanEmail,
+            avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
+            isSupervisor: true
+          };
+
+          // Link UID in Firestore
+          const memberDocRef = doc(db, 'team', String(foundMember.id));
+          await setDoc(memberDocRef, { 
+            uid: firebaseUser.uid,
+            email: cleanEmail 
+          }, { merge: true });
+          foundMember.uid = firebaseUser.uid;
+
           if (loginUser) loginUser(foundMember);
           setIsLoading(false);
           if (onLogin) onLogin(foundMember);
@@ -94,7 +135,13 @@ export const LoginScreen = ({ onLogin }) => {
         }
       } else {
         setIsLoading(false);
-        setError(`❌ خطأ في تسجيل الدخول: ${err.message}`);
+        if (err.code === 'auth/invalid-credential' || err.code === 'auth/wrong-password') {
+          setError('❌ كلمة المرور التي أدخلتها غير صحيحة أو البيانات غير مطابقة.');
+        } else if (err.code === 'auth/user-not-found') {
+          setError('❌ لم يتم العثور على بريد إلكتروني مسجل كعضو في الفريق. يرجى مراجعة مدير الاستوديو.');
+        } else {
+          setError(`❌ خطأ في تسجيل الدخول: ${err.message}`);
+        }
       }
     }
   };

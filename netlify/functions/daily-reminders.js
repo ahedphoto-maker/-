@@ -51,15 +51,12 @@ async function getSupervisors() {
   
   teamSnap.forEach(doc => {
     const data = doc.data();
-    const email = (data.email || '').toLowerCase().trim();
     const role = (data.role || '').toLowerCase();
     
     if (
       data.id === 1 || 
       data.isSupervisor || 
-      email === 'ahdalamary@gmail.com' || 
-      email === 'ahed@lensflow.sa' || 
-      email === 'admin@lensflow.sa' || 
+      data.uid === 'exGmtjCKN9ZKa3HvmoGxiCZH3O63' || // Admin UID
       role.includes('مدير') || 
       role.includes('مشرف')
     ) {

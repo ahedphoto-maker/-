@@ -74,7 +74,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
     {
       title: 'المالية والعقود',
       items: [
-        { id: 'invoices', label: 'الفواتير والمالية' },
+        { id: 'invoices', label: 'المالية' },
         { id: 'contracts', label: 'العقود الإلكترونية' },
         { id: 'map', label: 'خريطة الحجوزات' }
       ]

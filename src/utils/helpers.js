@@ -124,15 +124,17 @@ export const formatBookingNumber = (bookingNumber) => {
 };
 
 export const formatTime12h = (time24) => {
-  if (time24 === 'صباحًا' || time24 === 'مساءً') return time24;
-  if (time24.includes('ص') || time24.includes('م') || time24.includes('AM') || time24.includes('PM')) {
-    let result = time24;
+  if (!time24) return '';
+  const timeStr = String(time24);
+  if (timeStr === 'صباحًا' || timeStr === 'مساءً') return timeStr;
+  if (timeStr.includes('ص') || timeStr.includes('م') || timeStr.includes('AM') || timeStr.includes('PM')) {
+    let result = timeStr;
     if (result.includes('AM')) result = result.replace('AM', 'ص');
     if (result.includes('PM')) result = result.replace('PM', 'م');
     return result;
   }
-  const parts = time24.split(':');
-  if (parts.length < 2) return time24;
+  const parts = timeStr.split(':');
+  if (parts.length < 2) return timeStr;
   let hours = parseInt(parts[0], 10);
   const minutes = String(parts[1]).padStart(2, '0');
   const ampm = hours >= 12 ? 'م' : 'ص';
@@ -176,14 +178,14 @@ export const parseTime12hTo24h = (hourOrString, minutes, ampm) => {
 
 export const parse24hToParts = (time24) => {
   if (!time24) return { hours: '12', minutes: '00', ampm: 'ص' };
-  
-  if (time24.includes('ص') || time24.includes('م') || time24.includes('AM') || time24.includes('PM')) {
-    const cleanTime = time24.replace(/[صم\s]/g, '');
+  const timeStr = String(time24);
+  if (timeStr.includes('ص') || timeStr.includes('م') || timeStr.includes('AM') || timeStr.includes('PM')) {
+    const cleanTime = timeStr.replace(/[صم\s]/g, '');
     const parts = cleanTime.split(':');
     if (parts.length < 2) return { hours: '12', minutes: '00', ampm: 'ص' };
     const hours = parseInt(parts[0], 10);
     const minutes = parseInt(parts[1], 10);
-    const ampm = time24.includes('م') || time24.includes('PM') ? 'م' : 'ص';
+    const ampm = timeStr.includes('م') || timeStr.includes('PM') ? 'م' : 'ص';
     return {
       hours: String(hours),
       minutes: String(minutes).padStart(2, '0'),
@@ -191,7 +193,7 @@ export const parse24hToParts = (time24) => {
     };
   }
   
-  const parts = time24.split(':');
+  const parts = timeStr.split(':');
   if (parts.length < 2) return { hours: '12', minutes: '00', ampm: 'ص' };
   let rawHours = parseInt(parts[0], 10);
   const minutes = parseInt(parts[1], 10);

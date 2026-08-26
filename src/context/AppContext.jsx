@@ -50,10 +50,9 @@ export const AppProvider = ({ children }) => {
 
   const deriveUserRole = (user) => {
     if (!user || !user.id) return null;
-    const email = (user.email || '').toLowerCase().trim();
     const role = (user.role || '').toLowerCase();
     
-    if (user.id === 1 || user.isSupervisor || email === 'ahdalamary@gmail.com' || email === 'ahed@lensflow.sa' || email === 'admin@lensflow.sa' || role.includes('مدير') || role.includes('مشرف')) {
+    if (user.id === 1 || user.isSupervisor || user.uid === 'exGmtjCKN9ZKa3HvmoGxiCZH3O63' || role.includes('مدير') || role.includes('مشرف')) {
       return 'admin';
     }
     return 'employee';
@@ -137,23 +136,41 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (user && !user.isAnonymous) {
-        console.log("Firebase Auth active user email:", user.email);
+        console.log("Firebase Auth active user email:", user.email, "UID:", user.uid);
         setIsDbReady(true);
         // Sync React state if needed (e.g. after page reload)
-        if (!currentUser || currentUser.email !== user.email) {
-          const matched = team.find(m => m.email && m.email.toLowerCase().trim() === user.email.toLowerCase().trim());
+        if (!currentUser || currentUser.email !== user.email || !currentUser.uid) {
+          // Find member by UID first, then by email
+          const matched = team.find(m => m.uid === user.uid) || 
+                          team.find(m => m.email && m.email.toLowerCase().trim() === user.email.toLowerCase().trim());
           if (matched) {
             console.log("Syncing currentUser state from Firebase session:", matched.name);
-            setCurrentUser(matched);
-            setUserRole(deriveUserRole(matched));
-            localStorage.setItem('star_media_current_user', JSON.stringify(matched));
+            const updatedUser = { ...matched, uid: user.uid, email: user.email };
+            setCurrentUser(updatedUser);
+            setUserRole(deriveUserRole(updatedUser));
+            localStorage.setItem('star_media_current_user', JSON.stringify(updatedUser));
+
+            // Link UID and update email in Firestore team collection dynamically if needed
+            if (matched.uid !== user.uid || matched.email !== user.email) {
+              const memberDocRef = doc(db, 'team', String(matched.id));
+              setDoc(memberDocRef, { uid: user.uid, email: user.email }, { merge: true })
+                .then(() => console.log(`Linked UID ${user.uid} and updated email to ${user.email} for team member ${matched.name} in Firestore`))
+                .catch(err => console.warn(`Failed to link UID in Firestore:`, err));
+            }
           }
         }
       } else {
         console.log("No logged-in user in Firebase, checking current user local state...");
         if (currentUser && currentUser.email) {
-          console.log("Locally logged in, leaving database ready for auth flow.");
-          setIsDbReady(true);
+          if (typeof navigator !== 'undefined' && navigator.onLine) {
+            console.warn("Active local session but no Firebase Auth session. Logging out to force re-authentication.");
+            setTimeout(() => {
+              logoutUser();
+            }, 0);
+          } else {
+            console.log("Locally logged in (offline), leaving database ready for cache.");
+            setIsDbReady(true);
+          }
         } else {
           try {
             const userCredential = await signInAnonymously(auth);
@@ -167,7 +184,7 @@ export const AppProvider = ({ children }) => {
       }
     });
     return () => unsubAuth();
-  }, [currentUser, team]);
+  }, [currentUser, team, logoutUser]);
 
   // Real-time Firestore synchronization & automatic seeding
   useEffect(() => {
@@ -867,6 +884,24 @@ export const AppProvider = ({ children }) => {
     addAuditLog('تسجيل مصروفات', `تم تسجيل مصروف بقيمة ${sanitizedData.amount} ريال`, '💸');
   }, [addAuditLog, logFirestoreOp]);
 
+  const updatePayment = useCallback((paymentId, updatedFields) => {
+    const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
+    const target = payments.find(p => p.id === Number(paymentId));
+    if (target) {
+      const merged = { ...target, ...sanitizedFields };
+      logFirestoreOp('setDoc', 'payments', String(paymentId), () => setDoc(doc(db, 'payments', String(paymentId)), merged)).catch(err => console.warn('updatePayment error:', err));
+    }
+  }, [payments, logFirestoreOp]);
+
+  const updateExpense = useCallback((expenseId, updatedFields) => {
+    const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
+    const target = expenses.find(ex => ex.id === Number(expenseId));
+    if (target) {
+      const merged = { ...target, ...sanitizedFields };
+      logFirestoreOp('setDoc', 'expenses', String(expenseId), () => setDoc(doc(db, 'expenses', String(expenseId)), merged)).catch(err => console.warn('updateExpense error:', err));
+    }
+  }, [expenses, logFirestoreOp]);
+
   const updateSettings = useCallback((newSettings) => {
     const sanitizedSettings = sanitizeObjectToEnglishDigits(newSettings);
     logFirestoreOp('setDoc', 'settings', 'defaultConfig', () => setDoc(doc(db, 'settings', 'defaultConfig'), sanitizedSettings)).catch(err => console.warn('updateSettings error:', err));
@@ -884,7 +919,8 @@ export const AppProvider = ({ children }) => {
     if (!notif) return;
     logFirestoreOp('setDoc', 'notifications', String(notif.id), () => setDoc(doc(db, 'notifications', String(notif.id)), { ...notif, read: true })).catch(err => console.warn('handleNotificationClick error:', err));
 
-    const targetType = notif.entityType || (notif.type === 'booking' || notif.title.includes('حجز') ? 'booking' : notif.type === 'task' || notif.title.includes('مهمة') ? 'task' : notif.type === 'equipment' || notif.title.includes('معدة') ? 'equipment' : 'general');
+    const notifTitle = notif.title || '';
+    const targetType = notif.entityType || (notif.type === 'booking' || notifTitle.includes('حجز') ? 'booking' : notif.type === 'task' || notifTitle.includes('مهمة') ? 'task' : notif.type === 'equipment' || notifTitle.includes('معدة') ? 'equipment' : 'general');
     const targetId = notif.entityId || notif.bookingId;
 
     if (targetType === 'booking') {
@@ -1181,6 +1217,8 @@ export const AppProvider = ({ children }) => {
         updateInvoice,
         addPayment,
         addExpense,
+        updatePayment,
+        updateExpense,
         updateSettings,
         markNotificationAsRead,
         addAuditLog,

@@ -18,6 +18,7 @@ service cloud.firestore {
       return isAuthenticated() && (
         request.auth.token.role == 'admin' ||
         request.auth.token.isSupervisor == true ||
+        request.auth.uid == 'exGmtjCKN9ZKa3HvmoGxiCZH3O63' || // عاهد العماري (Primary Admin UID)
         (request.auth.token.keys().hasAll(['email']) && request.auth.token.email in ['ahdalamary@gmail.com', 'ahed@lensflow.sa', 'admin@lensflow.sa'])
       );
     }
@@ -38,7 +39,10 @@ service cloud.firestore {
 
     // Rules for Devices collection
     match /devices/{deviceId} {
-      allow read, write: if isAuthenticated();
+      allow read, write: if isAuthenticated() && (
+        request.auth.uid == (resource != null ? resource.data.userId : request.resource.data.userId) ||
+        isAdmin()
+      );
     }
 
     // Rules for Settings collection
