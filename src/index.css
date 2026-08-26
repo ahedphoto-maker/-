@@ -130,6 +130,10 @@ select option {
   min-height: 100vh;
   background-color: var(--bg-main);
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
 }
 
 .main-wrapper {
@@ -137,9 +141,13 @@ select option {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   background-color: var(--bg-main);
   margin-left: 0;
   padding-left: 0;
+  box-sizing: border-box;
 }
 
 @media (min-width: 993px) {
@@ -673,5 +681,227 @@ svg.lucide polygon {
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
+}
+
+/* ----------------------------------------------------
+   Radical Mobile UI Overhaul & Responsiveness Architecture
+   ---------------------------------------------------- */
+
+/* 1. Prevent Arabic word fracturing across elements */
+h1, h2, h3, h4, h5, h6, .btn, .badge, .card, button, select, option, span {
+  word-break: keep-all !important;
+  overflow-wrap: break-word !important;
+}
+
+/* 2. Global Table Responsiveness for Mobile Viewports */
+@media (max-width: 768px) {
+  table {
+    display: block !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
+
+/* 3. Topbar Styles & Overcrowding Prevention on Mobile */
+.app-header {
+  height: var(--topbar-height);
+  background-color: var(--bg-card);
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  z-index: var(--z-header);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.03);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.app-header-title {
+  font-size: 1.15rem;
+  font-weight: 900;
+  color: var(--text-main);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 250px;
+}
+
+.app-header-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 768px) {
+  .app-header {
+    padding: 0 8px !important;
+  }
+  .app-header-title {
+    font-size: 0.95rem;
+    max-width: 140px;
+  }
+  .app-header-controls {
+    gap: 6px !important;
+  }
+  .app-header-controls .btn-icon {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+  }
+  .app-header-controls img {
+    width: 30px !important;
+    height: 30px !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .app-header-title {
+    font-size: 0.82rem;
+    max-width: 90px;
+  }
+  .app-header-controls {
+    gap: 4px !important;
+  }
+  /* Hide theme toggle on tiny screens to avoid overcrowding */
+  .app-header-controls .theme-toggle-btn {
+    display: none !important;
+  }
+}
+
+/* 4. BottomNavbar & Main Content Spacing Settings */
+@media (max-width: 992px) {
+  .content-area {
+    padding-bottom: calc(75px + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
+
+/* 5. Shortcuts / Main Tab Bar Scrolling Rules */
+.tab-bar-container {
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+}
+
+.tab-bar-btn {
+  flex: 1;
+  padding: 11px;
+  border: none;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .tab-bar-container {
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    flex-wrap: nowrap !important;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    border-radius: 10px;
+  }
+  .tab-bar-container::-webkit-scrollbar {
+    display: none;
+  }
+  .tab-bar-btn {
+    flex: 0 0 auto !important;
+    padding: 8px 12px !important;
+    font-size: 0.76rem !important;
+  }
+}
+
+/* 6. Bookings Filter Bar Mobile Optimization */
+.filter-bar-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+  .filter-bar-container {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  
+  .filter-search-wrapper {
+    grid-column: span 2 !important;
+    width: 100% !important;
+  }
+  
+  .filter-period-select {
+    grid-column: span 1 !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+  
+  .filter-financial-select {
+    grid-column: span 1 !important;
+    width: 100% !important;
+    margin: 0 !important;
+  }
+  
+  .filter-view-toggle {
+    grid-column: span 2 !important;
+    width: 100% !important;
+    margin-top: 4px !important;
+  }
+  
+  .filter-view-toggle > div {
+    display: flex !important;
+    width: 100% !important;
+  }
+  
+  .filter-view-toggle button {
+    flex: 1 !important;
+    justify-content: center !important;
+  }
+
+  .filter-custom-date-container {
+    display: grid !important;
+    grid-template-columns: auto 1fr auto 1fr !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+    border-top: 1px solid var(--border-color);
+    padding-top: 10px;
+  }
+  
+  .filter-custom-date-container input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* 7. Stats Cards Mobile Adjustments */
+@media (max-width: 480px) {
+  .stats-grid-mobile {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+  /* If there are 5 elements, let the last element stretch full width for balance */
+  .stats-grid-mobile > div:last-child {
+    grid-column: span 2 !important;
+  }
 }
 

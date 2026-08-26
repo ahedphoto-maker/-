@@ -64,53 +64,27 @@ export const Topbar = ({ onOpenMobileSidebar }) => {
 
   return (
     <>
-      <header
-        style={{
-          height: 'var(--topbar-height)',
-          backgroundColor: 'var(--bg-card)',
-          borderBottom: '1px solid var(--border-color)',
-          padding: isMobile ? '0 10px' : '0 20px',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          position: 'sticky',
-          top: 0,
-          zIndex: 'var(--z-header)',
-          boxShadow: '0 2px 10px rgba(0, 0, 0, 0.03)',
-          width: '100%',
-          boxSizing: 'border-box'
-        }}
-      >
+      <header className="app-header">
         {/* Right Section: Sidebar Toggle & Page Title */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: isMobile ? '1 1 auto' : '0 1 auto' }}>
           {isMobile && (
             <button
               onClick={onOpenMobileSidebar}
               className="btn btn-secondary btn-icon icon-button"
-              style={{ flexShrink: 0, width: '38px', height: '38px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              style={{ flexShrink: 0, width: '34px', height: '34px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
               aria-label="القائمة"
             >
-              <Icons.Menu size={20} />
+              <Icons.Menu size={18} />
             </button>
           )}
 
-          <h2
-            style={{
-              fontSize: isMobile ? '0.92rem' : '1.15rem',
-              fontWeight: 900,
-              color: 'var(--text-main)',
-              whiteSpace: 'normal',
-              wordBreak: 'break-word',
-              lineHeight: 1.3,
-              margin: 0
-            }}
-          >
+          <h2 className="app-header-title">
             {pageTitles[activeTab] || 'لوحة التحكم الرئيسية'}
           </h2>
         </div>
 
         {/* Left Section: Controls */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '6px' : '10px', flexShrink: 0 }}>
+        <div className="app-header-controls">
           
           {/* Mobile Search Button */}
           {isMobile && (
@@ -118,8 +92,8 @@ export const Topbar = ({ onOpenMobileSidebar }) => {
               onClick={() => setActiveOverlay('SEARCH')}
               className="btn btn-secondary btn-icon"
               style={{
-                width: '36px',
-                height: '36px',
+                width: '32px',
+                height: '32px',
                 borderRadius: '50%',
                 padding: 0,
                 display: 'flex',
@@ -129,7 +103,7 @@ export const Topbar = ({ onOpenMobileSidebar }) => {
               }}
               aria-label="البحث السريع"
             >
-              <Icons.Search size={18} />
+              <Icons.Search size={16} />
             </button>
           )}
 
@@ -180,7 +154,7 @@ export const Topbar = ({ onOpenMobileSidebar }) => {
           {/* Theme Toggle Button */}
           <button
             onClick={toggleTheme}
-            className="btn btn-secondary btn-icon icon-button"
+            className="btn btn-secondary btn-icon icon-button theme-toggle-btn"
             style={{
               width: '36px',
               height: '36px',

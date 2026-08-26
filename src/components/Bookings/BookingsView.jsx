@@ -635,23 +635,13 @@ export const BookingsView = () => {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', width: '100%', position: 'relative', direction: 'rtl' }}>
       
       {/* 0. Main Tabs Bar */}
-      <div className="card no-print" style={{ padding: '6px', display: 'flex', gap: '6px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '14px' }}>
+      <div className="card no-print tab-bar-container">
         <button
           onClick={() => setActiveTab('bookings')}
+          className="tab-bar-btn"
           style={{
-            flex: 1,
-            padding: '11px',
-            border: 'none',
-            borderRadius: '10px',
             backgroundColor: activeTab === 'bookings' ? 'var(--primary-color)' : 'transparent',
-            color: activeTab === 'bookings' ? '#ffffff' : 'var(--text-muted)',
-            fontWeight: 800,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease'
+            color: activeTab === 'bookings' ? '#ffffff' : 'var(--text-muted)'
           }}
         >
           <Icons.Calendar size={15} />
@@ -659,20 +649,10 @@ export const BookingsView = () => {
         </button>
         <button
           onClick={() => setActiveTab('statements')}
+          className="tab-bar-btn"
           style={{
-            flex: 1,
-            padding: '11px',
-            border: 'none',
-            borderRadius: '10px',
             backgroundColor: activeTab === 'statements' ? 'var(--primary-color)' : 'transparent',
-            color: activeTab === 'statements' ? '#ffffff' : 'var(--text-muted)',
-            fontWeight: 800,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease'
+            color: activeTab === 'statements' ? '#ffffff' : 'var(--text-muted)'
           }}
         >
           <Icons.FileText size={15} />
@@ -680,20 +660,10 @@ export const BookingsView = () => {
         </button>
         <button
           onClick={() => setActiveTab('collaborations')}
+          className="tab-bar-btn"
           style={{
-            flex: 1,
-            padding: '11px',
-            border: 'none',
-            borderRadius: '10px',
             backgroundColor: activeTab === 'collaborations' ? 'var(--primary-color)' : 'transparent',
-            color: activeTab === 'collaborations' ? '#ffffff' : 'var(--text-muted)',
-            fontWeight: 800,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease'
+            color: activeTab === 'collaborations' ? '#ffffff' : 'var(--text-muted)'
           }}
         >
           <Icons.Handshake size={15} />
@@ -701,20 +671,10 @@ export const BookingsView = () => {
         </button>
         <button
           onClick={() => setActiveTab('waitlist')}
+          className="tab-bar-btn"
           style={{
-            flex: 1,
-            padding: '11px',
-            border: 'none',
-            borderRadius: '10px',
             backgroundColor: activeTab === 'waitlist' ? 'var(--primary-color)' : 'transparent',
-            color: activeTab === 'waitlist' ? '#ffffff' : 'var(--text-muted)',
-            fontWeight: 800,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease'
+            color: activeTab === 'waitlist' ? '#ffffff' : 'var(--text-muted)'
           }}
         >
           <Icons.Clock size={15} />
@@ -722,20 +682,10 @@ export const BookingsView = () => {
         </button>
         <button
           onClick={() => setActiveTab('quotations')}
+          className="tab-bar-btn"
           style={{
-            flex: 1,
-            padding: '11px',
-            border: 'none',
-            borderRadius: '10px',
             backgroundColor: activeTab === 'quotations' ? 'var(--primary-color)' : 'transparent',
-            color: activeTab === 'quotations' ? '#ffffff' : 'var(--text-muted)',
-            fontWeight: 800,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            transition: 'all 0.2s ease'
+            color: activeTab === 'quotations' ? '#ffffff' : 'var(--text-muted)'
           }}
         >
           <Icons.FileText size={15} />
@@ -759,42 +709,41 @@ export const BookingsView = () => {
               </button>
             )}
 
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
-              
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flex: '1 1 300px' }}>
-                <div style={{ position: 'relative', flex: 1 }}>
-                  <Icons.Search size={16} style={{ position: 'absolute', right: '12px', top: '11px', color: 'var(--text-muted)' }} />
-                  <input
-                    type="text"
-                    className="form-control"
-                    placeholder="رقم الحجز، عميل، جوال، مصور، فريلانسر، موقع..."
-                    value={searchFilter}
-                    onChange={e => setSearchFilter(e.target.value)}
-                    style={{ paddingRight: '36px', borderRadius: '50px', fontSize: '0.82rem', height: '38px' }}
-                  />
-                </div>
-
-                <select
-                  value={timeFilter}
-                  onChange={e => setTimeFilter(e.target.value)}
+            <div className="filter-bar-container">
+              {/* Search Filter Wrapper */}
+              <div className="filter-search-wrapper" style={{ position: 'relative', flex: isMobile ? 'none' : 1 }}>
+                <Icons.Search size={16} style={{ position: 'absolute', right: '12px', top: '11px', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
                   className="form-control"
-                  style={{ width: '135px', height: '38px', borderRadius: '50px', fontSize: '0.8rem', padding: '0 10px' }}
-                >
-                  <option value="all">كل الفترات</option>
-                  <option value="today">اليوم</option>
-                  <option value="tomorrow">غداً</option>
-                  <option value="week">هذا الأسبوع</option>
-                  <option value="upcoming">القادمة</option>
-                  <option value="custom">فترة مخصصة</option>
-                </select>
+                  placeholder="رقم الحجز، عميل، جوال، مصور، فريلانسر، موقع..."
+                  value={searchFilter}
+                  onChange={e => setSearchFilter(e.target.value)}
+                  style={{ paddingRight: '36px', borderRadius: '50px', fontSize: '0.82rem', height: '38px', width: '100%', boxSizing: 'border-box' }}
+                />
               </div>
+
+              {/* Period Filter Dropdown */}
+              <select
+                value={timeFilter}
+                onChange={e => setTimeFilter(e.target.value)}
+                className="form-control filter-period-select"
+                style={{ width: isMobile ? '100%' : '135px', height: '38px', borderRadius: '50px', fontSize: '0.8rem', padding: '0 10px', boxSizing: 'border-box' }}
+              >
+                <option value="all">كل الفترات</option>
+                <option value="today">اليوم</option>
+                <option value="tomorrow">غداً</option>
+                <option value="week">هذا الأسبوع</option>
+                <option value="upcoming">القادمة</option>
+                <option value="custom">فترة مخصصة</option>
+              </select>
 
               {/* Financial Filter Dropdown */}
               <select
                 value={financialFilter}
                 onChange={e => setFinancialFilter(e.target.value)}
-                className="form-control"
-                style={{ width: '150px', height: '38px', borderRadius: '50px', fontSize: '0.8rem', padding: '0 10px' }}
+                className="form-control filter-financial-select"
+                style={{ width: isMobile ? '100%' : '150px', height: '38px', borderRadius: '50px', fontSize: '0.8rem', padding: '0 10px', boxSizing: 'border-box' }}
               >
                 <option value="all">كل الحالات المالية</option>
                 <option value="unpaid">غير مدفوعة ❌</option>
@@ -802,8 +751,8 @@ export const BookingsView = () => {
                 <option value="no_price">بدون سعر ⚠️</option>
               </select>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <div style={{ display: 'flex', backgroundColor: 'var(--bg-main)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)' }}>
+              <div className="filter-view-toggle" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div style={{ display: 'flex', backgroundColor: 'var(--bg-main)', borderRadius: '6px', padding: '2px', border: '1px solid var(--border-color)', width: '100%' }}>
                   <button
                     onClick={() => setViewStyle('list')}
                     style={{
@@ -858,11 +807,11 @@ export const BookingsView = () => {
             </div>
 
             {timeFilter === 'custom' && (
-              <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap', borderTop: '1px solid var(--border-color)', paddingTop: '10px' }}>
+              <div className="filter-custom-date-container">
                 <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>من:</span>
-                <input type="date" className="form-control" value={customStart} onChange={e => setCustomStart(e.target.value)} style={{ width: '135px', height: '32px', fontSize: '0.78rem' }} />
+                <input type="date" className="form-control" value={customStart} onChange={e => setCustomStart(e.target.value)} style={{ height: '38px', fontSize: '0.78rem' }} />
                 <span style={{ fontSize: '0.78rem', fontWeight: 700 }}>إلى:</span>
-                <input type="date" className="form-control" value={customEnd} onChange={e => setCustomEnd(e.target.value)} style={{ width: '135px', height: '32px', fontSize: '0.78rem' }} />
+                <input type="date" className="form-control" value={customEnd} onChange={e => setCustomEnd(e.target.value)} style={{ height: '38px', fontSize: '0.78rem' }} />
               </div>
             )}
 
@@ -895,7 +844,7 @@ export const BookingsView = () => {
           </div>
 
           {/* 2. Premium Stat Cards (Requirement 11) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
+          <div className="stats-grid-mobile" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '10px' }}>
             <div className="card" style={{ padding: '12px', display: 'flex', flexDirection: 'column', gap: '4px', borderRight: '4px solid var(--primary-color)' }}>
               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 800 }}>إجمالي الحجوزات</span>
               <h3 style={{ fontSize: '1.25rem', fontWeight: 950, margin: 0 }}>{totalCount}</h3>
@@ -1434,7 +1383,7 @@ export const BookingsView = () => {
               boxShadow: '-8px 0 24px rgba(0,0,0,0.15)',
               display: 'flex',
               flexDirection: 'column',
-              padding: '24px',
+              padding: 'calc(24px + env(safe-area-inset-top, 0px)) 24px calc(24px + env(safe-area-inset-bottom, 0px)) 24px',
               boxSizing: 'border-box',
               overflowY: 'auto',
               gap: '16px'

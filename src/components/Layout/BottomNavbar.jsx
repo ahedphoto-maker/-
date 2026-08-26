@@ -39,17 +39,19 @@ export const BottomNavbar = ({ onOpenMobileSidebar }) => {
         bottom: 0,
         left: 0,
         right: 0,
-        height: '64px',
+        height: 'calc(64px + env(safe-area-inset-bottom, 0px))',
         backgroundColor: 'var(--bg-card)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
         borderTop: '1px solid var(--border-color)',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: 'flex-start',
         justifyContent: 'space-around',
         zIndex: 'var(--z-mobile-nav)',
         boxShadow: 'var(--card-shadow)',
-        paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        paddingTop: '6px',
+        paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+        boxSizing: 'border-box'
       }}
     >
       {navItems.map(item => {
@@ -111,7 +113,7 @@ export const BottomNavbar = ({ onOpenMobileSidebar }) => {
             }}
             style={{
               flex: 1,
-              height: '100%',
+              height: '52px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -122,7 +124,7 @@ export const BottomNavbar = ({ onOpenMobileSidebar }) => {
               color: isActive ? 'var(--primary-color)' : 'var(--text-muted)',
               cursor: 'pointer',
               position: 'relative',
-              padding: '6px 0'
+              padding: '0'
             }}
           >
             <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>

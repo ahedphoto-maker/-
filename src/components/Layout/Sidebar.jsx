@@ -147,7 +147,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         {/* Brand Header */}
         <div
           style={{
-            padding: '16px 20px',
+            padding: 'calc(16px + env(safe-area-inset-top, 0px)) 20px 16px 20px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
@@ -288,7 +288,7 @@ export const Sidebar = ({ isMobileOpen, setIsMobileOpen }) => {
         {/* User Profile Footer */}
         <div
           style={{
-            padding: '12px 16px',
+            padding: '12px 16px calc(12px + env(safe-area-inset-bottom, 0px)) 16px',
             borderTop: '1px solid rgba(255, 255, 255, 0.08)',
             display: 'flex',
             alignItems: 'center',

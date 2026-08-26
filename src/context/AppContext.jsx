@@ -98,11 +98,7 @@ export const AppProvider = ({ children }) => {
   const [team, setTeam] = useState(() => getStoredState('star_media_team', initialTeam));
   const [clients, setClients] = useState(() => getStoredState('star_media_clients', initialClients));
   const [companies, setCompanies] = useState(() => getStoredState('star_media_companies', initialCompanies));
-  const [freelancers, setFreelancers] = useState(() => getStoredState('star_media_freelancers', [
-    { id: 901, name: 'أحمد السلمي', phone: '0542223333', email: 'ahmed.salmi@example.com', notes: 'مصور درون وفيديو خارجي', monthlyAccount: true, rating: { commitment: 5, quality: 4, cooperation: 5, speed: 4 } },
-    { id: 902, name: 'سعد العتيبي', phone: '0559876543', email: 'saad.otb@example.com', notes: 'مصور فوتوغرافي محترف', monthlyAccount: false, rating: { commitment: 4, quality: 5, cooperation: 4, speed: 4 } },
-    { id: 903, name: 'رائد الحارثي', phone: '0564445555', email: 'raed.harbi@example.com', notes: 'متخصص تغطيات مؤتمرات', monthlyAccount: true, rating: { commitment: 5, quality: 5, cooperation: 4, speed: 5 } }
-  ]));
+  const [freelancers, setFreelancers] = useState(() => getStoredState('star_media_freelancers', []));
   const [equipment, setEquipment] = useState(() => getStoredState('star_media_equipment', initialEquipment));
   const [bookings, setBookings] = useState(() => getStoredState('star_media_bookings', initialBookings));
   const [projects, setProjects] = useState(() => getStoredState('star_media_projects', initialProjects));
@@ -118,13 +114,8 @@ export const AppProvider = ({ children }) => {
   const [customRoles, setCustomRoles] = useState(() => getStoredState('star_media_customRoles', initialCustomRoles));
 
   // New States for Comprehensive Upgrades
-  const [quotations, setQuotations] = useState(() => getStoredState('star_media_quotations', [
-    { id: 8001, quoteNumber: 'QT-2026-001', clientName: 'شركة الإبداع للفعاليات', date: '2026-08-20', totalPrice: 5000, description: 'عرض سعر لتصوير فيديو دعائي مدته دقيقة بدقة 4K', status: 'بانتظار العميل' },
-    { id: 8002, quoteNumber: 'QT-2026-002', clientName: 'متجر بيت ستايل', date: '2026-08-22', totalPrice: 3200, description: 'عرض سعر لتغطية موقع معرض الرياض الرئيسي', status: 'مقبول' }
-  ]));
-  const [waitlist, setWaitlist] = useState(() => getStoredState('star_media_waitlist', [
-    { id: 7001, clientName: 'صالون ستايل النسائي', date: '2026-08-12', phone: '0551234567', notes: 'يرغب بالتصوير مساءً' }
-  ]));
+  const [quotations, setQuotations] = useState(() => getStoredState('star_media_quotations', []));
+  const [waitlist, setWaitlist] = useState(() => getStoredState('star_media_waitlist', []));
   const [privacyMode, setPrivacyMode] = useState(() => getStoredState('star_media_privacyMode', false));
   const [isOnline, setIsOnline] = useState(() => getStoredState('star_media_isOnline', true));
   const [pendingOfflineActions, setPendingOfflineActions] = useState(() => getStoredState('star_media_pendingOfflineActions', []));
@@ -193,11 +184,7 @@ export const AppProvider = ({ children }) => {
       { name: 'team', stateSetter: setTeam, initialData: initialTeam },
       { name: 'clients', stateSetter: setClients, initialData: initialClients },
       { name: 'companies', stateSetter: setCompanies, initialData: initialCompanies },
-      { name: 'freelancers', stateSetter: setFreelancers, initialData: [
-        { id: 901, name: 'أحمد السلمي', phone: '0542223333', email: 'ahmed.salmi@example.com', notes: 'مصور درون وفيديو خارجي', monthlyAccount: true, rating: { commitment: 5, quality: 4, cooperation: 5, speed: 4 } },
-        { id: 902, name: 'سعد العتيبي', phone: '0559876543', email: 'saad.otb@example.com', notes: 'مصور فوتوغرافي محترف', monthlyAccount: false, rating: { commitment: 4, quality: 5, cooperation: 4, speed: 4 } },
-        { id: 903, name: 'رائد الحارثي', phone: '0564445555', email: 'raed.harbi@example.com', notes: 'متخصص تغطيات مؤتمرات', monthlyAccount: true, rating: { commitment: 5, quality: 5, cooperation: 4, speed: 5 } }
-      ] },
+      { name: 'freelancers', stateSetter: setFreelancers, initialData: [] },
       { name: 'equipment', stateSetter: setEquipment, initialData: initialEquipment },
       { name: 'bookings', stateSetter: setBookings, initialData: initialBookings },
       { name: 'projects', stateSetter: setProjects, initialData: initialProjects },
@@ -210,13 +197,8 @@ export const AppProvider = ({ children }) => {
       { name: 'contracts', stateSetter: setContracts, initialData: initialContracts },
       { name: 'files', stateSetter: setFiles, initialData: initialFiles },
       { name: 'customRoles', stateSetter: setCustomRoles, initialData: initialCustomRoles },
-      { name: 'quotations', stateSetter: setQuotations, initialData: [
-        { id: 8001, quoteNumber: 'QT-2026-001', clientName: 'شركة الإبداع للفعاليات', date: '2026-08-20', totalPrice: 5000, description: 'عرض سعر لتصوير فيديو دعائي مدته دقيقة بدقة 4K', status: 'بانتظار العميل' },
-        { id: 8002, quoteNumber: 'QT-2026-002', clientName: 'متجر بيت ستايل', date: '2026-08-22', totalPrice: 3200, description: 'عرض سعر لتغطية موقع معرض الرياض الرئيسي', status: 'مقبول' }
-      ] },
-      { name: 'waitlist', stateSetter: setWaitlist, initialData: [
-        { id: 7001, clientName: 'صالون ستايل النسائي', date: '2026-08-12', phone: '0551234567', notes: 'يرغب بالتصوير مساءً' }
-      ] }
+      { name: 'quotations', stateSetter: setQuotations, initialData: [] },
+      { name: 'waitlist', stateSetter: setWaitlist, initialData: [] }
     ];
 
     const unsubscribes = collectionsToSync.map(({ name, stateSetter, initialData }) => {
@@ -244,7 +226,10 @@ export const AppProvider = ({ children }) => {
             stateSetter(docs);
           } else {
             const isFromCache = snapshot.metadata.fromCache;
-            if (!isFromCache && navigator.onLine) {
+            // Only seed configuration/structural collections (team, customRoles, equipment)
+            // Prevent seeding operational datasets (bookings, clients, invoices, expenses, etc.) in Production
+            const seedableCollections = ['team', 'customRoles', 'equipment'];
+            if (!isFromCache && navigator.onLine && seedableCollections.includes(name)) {
               console.log(`Firestore collection '${name}' is empty on server, seeding...`);
               const batch = writeBatch(db);
               initialData.forEach(item => {
@@ -257,7 +242,8 @@ export const AppProvider = ({ children }) => {
                 })
                 .catch(err => console.error(`Error seeding ${name}:`, err));
             } else {
-              console.log(`Collection '${name}' returned empty from cache/offline. Keeping cached state.`);
+              console.log(`Collection '${name}' is empty on server. Keeping empty state.`);
+              stateSetter([]);
               if (name === 'bookings') setIsLoadingBookings(false);
             }
           }

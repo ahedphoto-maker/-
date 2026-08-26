@@ -256,7 +256,9 @@ export const DashboardView = () => {
             ? (userRole === 'admin' ? 'repeat(2, 1fr)' : 'repeat(1, 1fr)') 
             : (userRole === 'admin' ? 'repeat(4, 1fr)' : 'repeat(3, 1fr)'), 
           gap: '12px',
-          width: '100%'
+          width: '100%',
+          maxWidth: '100%',
+          boxSizing: 'border-box'
         }}
       >
         {/* Stat 1: Revenue (Admin Only) */}
@@ -408,7 +410,10 @@ export const DashboardView = () => {
           style={{ 
             display: 'grid', 
             gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', 
-            gap: '10px' 
+            gap: '10px',
+            width: '100%',
+            maxWidth: '100%',
+            boxSizing: 'border-box'
           }}
         >
           {/* Action 1: Add Booking */}
