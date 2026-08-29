@@ -1,4 +1,4 @@
-const CACHE_NAME = 'star-media-pwa-cache-v4';
+const CACHE_NAME = 'star-media-pwa-cache-v7';
 const ASSETS_TO_CACHE = [
   '/',
   '/index.html',
@@ -51,6 +51,24 @@ self.addEventListener('fetch', event => {
     return;
   }
 
+  // Use Network-First strategy for navigation requests (main page loading)
+  if (event.request.mode === 'navigate') {
+    event.respondWith(
+      fetch(event.request)
+        .then(networkResponse => {
+          return caches.open(CACHE_NAME).then(cache => {
+            cache.put(event.request, networkResponse.clone());
+            return networkResponse;
+          });
+        })
+        .catch(() => {
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // Cache-First for static assets to ensure offline support
   event.respondWith(
     caches.match(event.request).then(cachedResponse => {
       if (cachedResponse) {
@@ -69,11 +87,6 @@ self.addEventListener('fetch', event => {
           });
         }
         return networkResponse;
-      }).catch(() => {
-        // Fallback for document requests when offline
-        if (event.request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
       });
     })
   );
@@ -129,18 +142,19 @@ self.addEventListener('notificationclick', event => {
   }
 
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
-      // Find an open tab and navigate/focus it, or open new window
-      for (const client of clientList) {
-        if ('focus' in client && 'navigate' in client) {
-          client.navigate(targetUrl);
-          return client.focus();
+    self.registration.getNotifications().then(notifications => {
+      return self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientList => {
+        // Find an open tab and navigate/focus it, or open new window
+        for (const client of clientList) {
+          if ('focus' in client && 'navigate' in client) {
+            client.navigate(targetUrl);
+            return client.focus();
+          }
         }
-      }
-      if (self.clients.openWindow) {
-        return self.clients.openWindow(targetUrl);
-      }
+        if (self.clients.openWindow) {
+          return self.clients.openWindow(targetUrl);
+        }
+      });
     })
   );
 });
-
