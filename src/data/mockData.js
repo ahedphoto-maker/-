@@ -73,6 +73,7 @@ export const initialTeam = [
 
 export const initialClients = [];
 export const initialCompanies = [];
+export const initialFreelancers = [];
 
 export const initialEquipment = [
   {
@@ -247,6 +248,8 @@ export const initialAuditLogs = [];
 export const initialNotifications = [];
 export const initialContracts = [];
 export const initialFiles = [];
+export const initialQuotations = [];
+export const initialWaitlist = [];
 
 export const initialCustomRoles = [
   { id: 'admin', label: 'مدير النظام (Admin)', permissions: { view: true, create: true, edit: true, delete: true, approve: true, export: true, assign: true, manage: true } },
