@@ -50,9 +50,10 @@ export const AppProvider = ({ children }) => {
 
   const deriveUserRole = (user) => {
     if (!user || !user.id) return null;
+    const email = (user.email || '').toLowerCase().trim();
     const role = (user.role || '').toLowerCase();
     
-    if (user.id === 1 || user.isSupervisor || user.uid === 'exGmtjCKN9ZKa3HvmoGxiCZH3O63' || role.includes('مدير') || role.includes('مشرف')) {
+    if (user.id === 1 || user.isSupervisor || email === 'ahdalamary@gmail.com' || email === 'ahed@lensflow.sa' || email === 'admin@lensflow.sa' || role.includes('مدير') || role.includes('مشرف')) {
       return 'admin';
     }
     return 'employee';
@@ -98,7 +99,11 @@ export const AppProvider = ({ children }) => {
   const [team, setTeam] = useState(() => getStoredState('star_media_team', initialTeam));
   const [clients, setClients] = useState(() => getStoredState('star_media_clients', initialClients));
   const [companies, setCompanies] = useState(() => getStoredState('star_media_companies', initialCompanies));
-  const [freelancers, setFreelancers] = useState(() => getStoredState('star_media_freelancers', []));
+  const [freelancers, setFreelancers] = useState(() => getStoredState('star_media_freelancers', [
+    { id: 901, name: 'أحمد السلمي', phone: '0542223333', email: 'ahmed.salmi@example.com', notes: 'مصور درون وفيديو خارجي', monthlyAccount: true, rating: { commitment: 5, quality: 4, cooperation: 5, speed: 4 } },
+    { id: 902, name: 'سعد العتيبي', phone: '0559876543', email: 'saad.otb@example.com', notes: 'مصور فوتوغرافي محترف', monthlyAccount: false, rating: { commitment: 4, quality: 5, cooperation: 4, speed: 4 } },
+    { id: 903, name: 'رائد الحارثي', phone: '0564445555', email: 'raed.harbi@example.com', notes: 'متخصص تغطيات مؤتمرات', monthlyAccount: true, rating: { commitment: 5, quality: 5, cooperation: 4, speed: 5 } }
+  ]));
   const [equipment, setEquipment] = useState(() => getStoredState('star_media_equipment', initialEquipment));
   const [bookings, setBookings] = useState(() => getStoredState('star_media_bookings', initialBookings));
   const [projects, setProjects] = useState(() => getStoredState('star_media_projects', initialProjects));
@@ -114,8 +119,13 @@ export const AppProvider = ({ children }) => {
   const [customRoles, setCustomRoles] = useState(() => getStoredState('star_media_customRoles', initialCustomRoles));
 
   // New States for Comprehensive Upgrades
-  const [quotations, setQuotations] = useState(() => getStoredState('star_media_quotations', []));
-  const [waitlist, setWaitlist] = useState(() => getStoredState('star_media_waitlist', []));
+  const [quotations, setQuotations] = useState(() => getStoredState('star_media_quotations', [
+    { id: 8001, quoteNumber: 'QT-2026-001', clientName: 'شركة الإبداع للفعاليات', date: '2026-08-20', totalPrice: 5000, description: 'عرض سعر لتصوير فيديو دعائي مدته دقيقة بدقة 4K', status: 'بانتظار العميل' },
+    { id: 8002, quoteNumber: 'QT-2026-002', clientName: 'متجر بيت ستايل', date: '2026-08-22', totalPrice: 3200, description: 'عرض سعر لتغطية موقع معرض الرياض الرئيسي', status: 'مقبول' }
+  ]));
+  const [waitlist, setWaitlist] = useState(() => getStoredState('star_media_waitlist', [
+    { id: 7001, clientName: 'صالون ستايل النسائي', date: '2026-08-12', phone: '0551234567', notes: 'يرغب بالتصوير مساءً' }
+  ]));
   const [privacyMode, setPrivacyMode] = useState(() => getStoredState('star_media_privacyMode', false));
   const [isOnline, setIsOnline] = useState(() => getStoredState('star_media_isOnline', true));
   const [pendingOfflineActions, setPendingOfflineActions] = useState(() => getStoredState('star_media_pendingOfflineActions', []));
@@ -127,41 +137,23 @@ export const AppProvider = ({ children }) => {
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(auth, async (user) => {
       if (user && !user.isAnonymous) {
-        console.log("Firebase Auth active user email:", user.email, "UID:", user.uid);
+        console.log("Firebase Auth active user email:", user.email);
         setIsDbReady(true);
         // Sync React state if needed (e.g. after page reload)
-        if (!currentUser || currentUser.email !== user.email || !currentUser.uid) {
-          // Find member by UID first, then by email
-          const matched = team.find(m => m.uid === user.uid) || 
-                          team.find(m => m.email && m.email.toLowerCase().trim() === user.email.toLowerCase().trim());
+        if (!currentUser || currentUser.email !== user.email) {
+          const matched = team.find(m => m.email && m.email.toLowerCase().trim() === user.email.toLowerCase().trim());
           if (matched) {
             console.log("Syncing currentUser state from Firebase session:", matched.name);
-            const updatedUser = { ...matched, uid: user.uid, email: user.email };
-            setCurrentUser(updatedUser);
-            setUserRole(deriveUserRole(updatedUser));
-            localStorage.setItem('star_media_current_user', JSON.stringify(updatedUser));
-
-            // Link UID and update email in Firestore team collection dynamically if needed
-            if (matched.uid !== user.uid || matched.email !== user.email) {
-              const memberDocRef = doc(db, 'team', String(matched.id));
-              setDoc(memberDocRef, { uid: user.uid, email: user.email }, { merge: true })
-                .then(() => console.log(`Linked UID ${user.uid} and updated email to ${user.email} for team member ${matched.name} in Firestore`))
-                .catch(err => console.warn(`Failed to link UID in Firestore:`, err));
-            }
+            setCurrentUser(matched);
+            setUserRole(deriveUserRole(matched));
+            localStorage.setItem('star_media_current_user', JSON.stringify(matched));
           }
         }
       } else {
         console.log("No logged-in user in Firebase, checking current user local state...");
         if (currentUser && currentUser.email) {
-          if (typeof navigator !== 'undefined' && navigator.onLine) {
-            console.warn("Active local session but no Firebase Auth session. Logging out to force re-authentication.");
-            setTimeout(() => {
-              logoutUser();
-            }, 0);
-          } else {
-            console.log("Locally logged in (offline), leaving database ready for cache.");
-            setIsDbReady(true);
-          }
+          console.log("Locally logged in, leaving database ready for auth flow.");
+          setIsDbReady(true);
         } else {
           try {
             const userCredential = await signInAnonymously(auth);
@@ -175,7 +167,7 @@ export const AppProvider = ({ children }) => {
       }
     });
     return () => unsubAuth();
-  }, [currentUser, team, logoutUser]);
+  }, [currentUser, team]);
 
   // Real-time Firestore synchronization & automatic seeding
   useEffect(() => {
@@ -184,7 +176,11 @@ export const AppProvider = ({ children }) => {
       { name: 'team', stateSetter: setTeam, initialData: initialTeam },
       { name: 'clients', stateSetter: setClients, initialData: initialClients },
       { name: 'companies', stateSetter: setCompanies, initialData: initialCompanies },
-      { name: 'freelancers', stateSetter: setFreelancers, initialData: [] },
+      { name: 'freelancers', stateSetter: setFreelancers, initialData: [
+        { id: 901, name: 'أحمد السلمي', phone: '0542223333', email: 'ahmed.salmi@example.com', notes: 'مصور درون وفيديو خارجي', monthlyAccount: true, rating: { commitment: 5, quality: 4, cooperation: 5, speed: 4 } },
+        { id: 902, name: 'سعد العتيبي', phone: '0559876543', email: 'saad.otb@example.com', notes: 'مصور فوتوغرافي محترف', monthlyAccount: false, rating: { commitment: 4, quality: 5, cooperation: 4, speed: 4 } },
+        { id: 903, name: 'رائد الحارثي', phone: '0564445555', email: 'raed.harbi@example.com', notes: 'متخصص تغطيات مؤتمرات', monthlyAccount: true, rating: { commitment: 5, quality: 5, cooperation: 4, speed: 5 } }
+      ] },
       { name: 'equipment', stateSetter: setEquipment, initialData: initialEquipment },
       { name: 'bookings', stateSetter: setBookings, initialData: initialBookings },
       { name: 'projects', stateSetter: setProjects, initialData: initialProjects },
@@ -197,8 +193,13 @@ export const AppProvider = ({ children }) => {
       { name: 'contracts', stateSetter: setContracts, initialData: initialContracts },
       { name: 'files', stateSetter: setFiles, initialData: initialFiles },
       { name: 'customRoles', stateSetter: setCustomRoles, initialData: initialCustomRoles },
-      { name: 'quotations', stateSetter: setQuotations, initialData: [] },
-      { name: 'waitlist', stateSetter: setWaitlist, initialData: [] }
+      { name: 'quotations', stateSetter: setQuotations, initialData: [
+        { id: 8001, quoteNumber: 'QT-2026-001', clientName: 'شركة الإبداع للفعاليات', date: '2026-08-20', totalPrice: 5000, description: 'عرض سعر لتصوير فيديو دعائي مدته دقيقة بدقة 4K', status: 'بانتظار العميل' },
+        { id: 8002, quoteNumber: 'QT-2026-002', clientName: 'متجر بيت ستايل', date: '2026-08-22', totalPrice: 3200, description: 'عرض سعر لتغطية موقع معرض الرياض الرئيسي', status: 'مقبول' }
+      ] },
+      { name: 'waitlist', stateSetter: setWaitlist, initialData: [
+        { id: 7001, clientName: 'صالون ستايل النسائي', date: '2026-08-12', phone: '0551234567', notes: 'يرغب بالتصوير مساءً' }
+      ] }
     ];
 
     const unsubscribes = collectionsToSync.map(({ name, stateSetter, initialData }) => {
@@ -226,10 +227,7 @@ export const AppProvider = ({ children }) => {
             stateSetter(docs);
           } else {
             const isFromCache = snapshot.metadata.fromCache;
-            // Only seed configuration/structural collections (team, customRoles, equipment)
-            // Prevent seeding operational datasets (bookings, clients, invoices, expenses, etc.) in Production
-            const seedableCollections = ['team', 'customRoles', 'equipment'];
-            if (!isFromCache && navigator.onLine && seedableCollections.includes(name)) {
+            if (!isFromCache && navigator.onLine) {
               console.log(`Firestore collection '${name}' is empty on server, seeding...`);
               const batch = writeBatch(db);
               initialData.forEach(item => {
@@ -242,8 +240,7 @@ export const AppProvider = ({ children }) => {
                 })
                 .catch(err => console.error(`Error seeding ${name}:`, err));
             } else {
-              console.log(`Collection '${name}' is empty on server. Keeping empty state.`);
-              stateSetter([]);
+              console.log(`Collection '${name}' returned empty from cache/offline. Keeping cached state.`);
               if (name === 'bookings') setIsLoadingBookings(false);
             }
           }
@@ -389,76 +386,6 @@ export const AppProvider = ({ children }) => {
   }, [currentUser, userRole, logFirestoreOp]);
 
   // Bookings CRUD
-  const syncBookingWithInvoice = useCallback((booking) => {
-    if (booking.totalPrice === null || booking.totalPrice === undefined) return;
-
-    const existingInvoice = invoices.find(inv => String(inv.bookingId) === String(booking.id));
-
-    const totalVal = Number(booking.totalPrice) || 0;
-    const subtotal = totalVal / 1.15;
-    const taxAmount = totalVal - subtotal;
-
-    // Calculate actual payments from existing payments linked to this booking/invoice
-    const relatedPayments = payments.filter(p => 
-      (String(p.bookingId) === String(booking.id) || (existingInvoice && String(p.invoiceNumber) === String(existingInvoice.invoiceNumber))) && 
-      p.status !== 'ملغي' && p.status !== 'ملغاة'
-    );
-    const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-
-    let statusVal = 'غير مدفوعة';
-    if (booking.status === 'ملغي' || booking.status === 'ملغاة') {
-      statusVal = 'ملغاة';
-    } else if (totalPaid >= totalVal) {
-      statusVal = 'مدفوعة';
-    } else if (totalPaid > 0) {
-      statusVal = 'جزئي';
-    }
-
-    if (existingInvoice) {
-      const updatedInvoice = {
-        ...existingInvoice,
-        clientName: booking.clientName || existingInvoice.clientName || '',
-        clientEmail: booking.clientEmail || existingInvoice.clientEmail || '',
-        total: totalVal,
-        subtotal: Number(subtotal.toFixed(2)),
-        taxAmount: Number(taxAmount.toFixed(2)),
-        paid: totalPaid,
-        status: statusVal,
-        items: [
-          { id: Date.now(), description: `تغطية خدمات تصوير - حجز رقم ${booking.bookingNumber}`, quantity: 1, price: totalVal }
-        ]
-      };
-      logFirestoreOp('setDoc', 'invoices', String(existingInvoice.id), () => setDoc(doc(db, 'invoices', String(existingInvoice.id)), updatedInvoice)).catch(err => {
-        console.warn('syncBookingWithInvoice update error:', err);
-      });
-    } else {
-      const newInvoiceId = Date.now();
-      const newInvoice = {
-        id: newInvoiceId,
-        invoiceNumber: `INV-2026-${Math.floor(Math.random() * 900) + 100}`,
-        clientName: booking.clientName || '',
-        clientEmail: booking.clientEmail || '',
-        bookingId: booking.id,
-        bookingNumber: booking.bookingNumber,
-        issueDate: booking.date || new Date().toISOString().substring(0, 10),
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10),
-        subtotal: Number(subtotal.toFixed(2)),
-        taxRate: 15,
-        taxAmount: Number(taxAmount.toFixed(2)),
-        total: totalVal,
-        paid: totalPaid,
-        status: statusVal,
-        items: [
-          { id: Date.now(), description: `تغطية خدمات تصوير - حجز رقم ${booking.bookingNumber}`, quantity: 1, price: totalVal }
-        ],
-        notes: 'تلقائي من الحجز الأصلي'
-      };
-      logFirestoreOp('setDoc', 'invoices', String(newInvoiceId), () => setDoc(doc(db, 'invoices', String(newInvoiceId)), newInvoice)).catch(err => {
-        console.warn('syncBookingWithInvoice create error:', err);
-      });
-    }
-  }, [invoices, payments, logFirestoreOp]);
-
   const addBooking = useCallback((bookingData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(bookingData);
     const activeUid = auth.currentUser?.uid || 'anonymous';
@@ -559,7 +486,6 @@ export const AppProvider = ({ children }) => {
         showCelebration('تم إنشاء الحجز وتزامنه بنجاح! 🎉');
         newBookings.forEach(booking => {
           triggerNotificationEvent('booking_created', booking, currentUser);
-          syncBookingWithInvoice(booking);
         });
       })
       .catch(err => {
@@ -572,7 +498,7 @@ export const AppProvider = ({ children }) => {
       addAuditLog('إنشاء حجوزات متكررة', `تم إنشاء عدد ${newBookings.length} حجوزات متكررة لـ ${newBookings[0].title}`, '📅');
     }
     return newBookings[0];
-  }, [addAuditLog, currentUser, userRole, logFirestoreOp, syncBookingWithInvoice]);
+  }, [addAuditLog, currentUser, userRole, logFirestoreOp]);
 
   const updateBooking = useCallback((bookingId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
@@ -620,7 +546,6 @@ export const AppProvider = ({ children }) => {
 
     logFirestoreOp('setDoc', 'bookings', String(bookingId), () => setDoc(doc(db, 'bookings', String(bookingId)), merged))
       .then(() => {
-        syncBookingWithInvoice(merged);
         if (changes.length > 0) {
           triggerNotificationEvent('booking_updated', merged, currentUser);
         }
@@ -629,7 +554,7 @@ export const AppProvider = ({ children }) => {
         console.error(`Firestore write error [collection: bookings, action: update, doc: ${bookingId}]:`, err);
       });
     addAuditLog('تحديث حجز', `تم تعديل تفاصيل الحجز رقم ${bookingId}`, '📅');
-  }, [addAuditLog, bookings, currentUser, logFirestoreOp, syncBookingWithInvoice]);
+  }, [addAuditLog, bookings, currentUser, logFirestoreOp]);
 
   const deleteBooking = useCallback((bookingId) => {
     const target = bookings.find(b => b.id === Number(bookingId));
@@ -639,7 +564,6 @@ export const AppProvider = ({ children }) => {
       const updated = { ...target, status: 'ملغي' };
       logFirestoreOp('setDoc', 'bookings', String(bookingId), () => setDoc(doc(db, 'bookings', String(bookingId)), updated))
         .then(() => {
-          syncBookingWithInvoice(updated);
           triggerNotificationEvent('booking_cancelled', updated, currentUser);
         })
         .catch(err => {
@@ -653,16 +577,12 @@ export const AppProvider = ({ children }) => {
     logFirestoreOp('deleteDoc', 'bookings', String(bookingId), () => deleteDoc(doc(db, 'bookings', String(bookingId))))
       .then(() => {
         triggerNotificationEvent('booking_deleted', target, currentUser);
-        const linkedInvoice = invoices.find(inv => String(inv.bookingId) === String(bookingId));
-        if (linkedInvoice) {
-          cancelInvoice(linkedInvoice.id).catch(() => {});
-        }
       })
       .catch(err => {
         console.error(`Firestore delete error [collection: bookings, doc: ${bookingId}]:`, err);
       });
     addAuditLog('حذف حجز', `تم إزالة الحجز رقم ${bookingId}`, '❌');
-  }, [addAuditLog, bookings, currentUser, logFirestoreOp, syncBookingWithInvoice, invoices, cancelInvoice]);
+  }, [addAuditLog, bookings, currentUser, logFirestoreOp]);
 
   // Tasks CRUD
   const addTask = useCallback((taskData) => {
@@ -800,19 +720,6 @@ export const AppProvider = ({ children }) => {
     }
   }, [clients, logFirestoreOp]);
 
-  const deleteClient = useCallback((clientId) => {
-    const target = clients.find(c => c.id === Number(clientId));
-    if (!target) return Promise.reject(new Error('العميل غير موجود'));
-    return logFirestoreOp('deleteDoc', 'clients', String(clientId), () =>
-      deleteDoc(doc(db, 'clients', String(clientId)))
-    ).then(() => {
-      addAuditLog('حذف عميل', `تم حذف العميل: ${target.name} (ID: ${clientId})`, '🗑️');
-    }).catch(err => {
-      console.warn('deleteClient error:', err);
-      throw err;
-    });
-  }, [clients, addAuditLog, logFirestoreOp]);
-
   // Freelancers CRUD
   const addFreelancer = useCallback((freelancerData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(freelancerData);
@@ -835,16 +742,6 @@ export const AppProvider = ({ children }) => {
       logFirestoreOp('setDoc', 'freelancers', String(freelancerId), () => setDoc(doc(db, 'freelancers', String(freelancerId)), merged)).catch(err => console.warn('updateFreelancer error:', err));
     }
   }, [freelancers, logFirestoreOp]);
-
-  const deleteFreelancer = useCallback((freelancerId) => {
-    const target = freelancers.find(f => f.id === Number(freelancerId));
-    if (!target) return Promise.reject(new Error('المصور غير موجود'));
-    return logFirestoreOp('deleteDoc', 'freelancers', String(freelancerId), () =>
-      deleteDoc(doc(db, 'freelancers', String(freelancerId)))
-    ).then(() => {
-      addAuditLog('حذف مصور فريلانسر', `تم حذف الفريلانسر: ${target.name} (ID: ${freelancerId})`, '🗑️');
-    }).catch(err => { console.warn('deleteFreelancer error:', err); throw err; });
-  }, [freelancers, addAuditLog, logFirestoreOp]);
 
   // Equipment actions
   const updateEquipment = useCallback((equipmentId, updatedFields) => {
@@ -944,157 +841,21 @@ export const AppProvider = ({ children }) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
     const target = invoices.find(inv => inv.id === Number(invoiceId));
     if (target) {
-      const changes = [];
-      if (sanitizedFields.total !== undefined && Number(sanitizedFields.total) !== Number(target.total)) {
-        changes.push(`الإجمالي من ${target.total} إلى ${sanitizedFields.total}`);
-      }
-      if (sanitizedFields.paid !== undefined && Number(sanitizedFields.paid) !== Number(target.paid)) {
-        changes.push(`المدفوع من ${target.paid} إلى ${sanitizedFields.paid}`);
-      }
-      if (sanitizedFields.status !== undefined && sanitizedFields.status !== target.status) {
-        changes.push(`الحالة من "${target.status}" إلى "${sanitizedFields.status}"`);
-      }
-      
       const merged = { ...target, ...sanitizedFields };
-      logFirestoreOp('setDoc', 'invoices', String(invoiceId), () => setDoc(doc(db, 'invoices', String(invoiceId)), merged))
-        .then(() => {
-          if (changes.length > 0) {
-            addAuditLog('تحديث فاتورة', `تم تعديل الفاتورة رقم ${target.invoiceNumber || invoiceId}: ${changes.join(' | ')}`, '📄');
-          }
-        })
-        .catch(err => console.warn('updateInvoice error:', err));
+      logFirestoreOp('setDoc', 'invoices', String(invoiceId), () => setDoc(doc(db, 'invoices', String(invoiceId)), merged)).catch(err => console.warn('updateInvoice error:', err));
     }
-  }, [invoices, addAuditLog, logFirestoreOp]);
-
-  // Archive (cancel) invoice - never hard-delete to preserve financial history
-  const cancelInvoice = useCallback((invoiceId) => {
-    const target = invoices.find(inv => inv.id === Number(invoiceId));
-    if (!target) return Promise.reject(new Error('الفاتورة غير موجودة'));
-    const archived = { ...target, status: 'ملغاة', cancelledAt: new Date().toISOString(), cancelledBy: currentUser?.name || 'مشرف' };
-    return logFirestoreOp('setDoc', 'invoices', String(invoiceId), () =>
-      setDoc(doc(db, 'invoices', String(invoiceId)), archived)
-    ).then(() => {
-      addAuditLog('إلغاء فاتورة', `تم إلغاء الفاتورة رقم ${target.invoiceNumber || invoiceId} بقيمة ${target.total || 0} ريال`, '🗑️');
-    }).catch(err => { console.warn('cancelInvoice error:', err); throw err; });
-  }, [invoices, currentUser, addAuditLog, logFirestoreOp]);
-
-  const deleteInvoice = useCallback((invoiceId) => {
-    const target = invoices.find(inv => inv.id === Number(invoiceId));
-    if (!target) return Promise.reject(new Error('الفاتورة غير موجودة'));
-    return logFirestoreOp('deleteDoc', 'invoices', String(invoiceId), () =>
-      deleteDoc(doc(db, 'invoices', String(invoiceId)))
-    ).then(() => {
-      addAuditLog('حذف فاتورة نهائياً', `تم حذف الفاتورة رقم ${target.invoiceNumber || invoiceId} بقيمة ${target.total || 0} ريال نهائياً`, '🗑️');
-    }).catch(err => { console.warn('deleteInvoice error:', err); throw err; });
-  }, [invoices, addAuditLog, logFirestoreOp]);
+  }, [invoices, logFirestoreOp]);
 
   const addPayment = useCallback((paymentData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(paymentData);
     const newPayment = {
       ...sanitizedData,
-      id: Date.now(),
-      status: sanitizedData.status || 'نشط'
+      id: Date.now()
     };
-    logFirestoreOp('setDoc', 'payments', String(newPayment.id), () => setDoc(doc(db, 'payments', String(newPayment.id)), newPayment))
-      .then(() => {
-        let bookingId = sanitizedData.bookingId;
-        const invoice = invoices.find(inv => String(inv.invoiceNumber) === String(sanitizedData.invoiceNumber));
-        if (invoice) {
-          if (!bookingId) bookingId = invoice.bookingId;
-          const relatedPayments = [...payments, newPayment].filter(p => String(p.invoiceNumber) === String(invoice.invoiceNumber) && p.status !== 'ملغي' && p.status !== 'ملغاة');
-          const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-          
-          updateInvoice(invoice.id, {
-            paid: totalPaid,
-            status: totalPaid >= invoice.total ? 'مدفوعة' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوعة')
-          });
-
-          if (bookingId) {
-            const booking = bookings.find(b => String(b.id) === String(bookingId));
-            if (booking) {
-              const bPrice = Number(booking.totalPrice) || 0;
-              const remaining = Math.max(0, bPrice - totalPaid);
-              updateBooking(booking.id, {
-                paidAmount: totalPaid,
-                remainingAmount: remaining,
-                paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
-                financialStatus: remaining === 0 ? 'settled' : 'due'
-              });
-            }
-          }
-        } else if (bookingId) {
-          const booking = bookings.find(b => String(b.id) === String(bookingId));
-          if (booking) {
-            const relatedPayments = [...payments, newPayment].filter(p => String(p.bookingId) === String(bookingId) && p.status !== 'ملغي' && p.status !== 'ملغاة');
-            const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-            const bPrice = Number(booking.totalPrice) || 0;
-            const remaining = Math.max(0, bPrice - totalPaid);
-            updateBooking(booking.id, {
-              paidAmount: totalPaid,
-              remainingAmount: remaining,
-              paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
-              financialStatus: remaining === 0 ? 'settled' : 'due'
-            });
-          }
-        }
-      })
-      .catch(err => console.warn('addPayment error:', err));
-    addAuditLog('تسجيل دفعة', `تم تسجيل دفعة بقيمة ${sanitizedData.amount} ريال للعميل ${sanitizedData.clientName || ''}`, '💰');
+    logFirestoreOp('setDoc', 'payments', String(newPayment.id), () => setDoc(doc(db, 'payments', String(newPayment.id)), newPayment)).catch(err => console.warn('addPayment error:', err));
+    addAuditLog('تسجيل دفعة', `تم تسجيل دفعة بقيمة ${sanitizedData.amount} ريال`, '💰');
     showCelebration('تم تسجيل الدفعة المالية بنجاح! 💰');
-  }, [addAuditLog, logFirestoreOp, invoices, payments, bookings, updateInvoice, updateBooking]);
-
-  // Reverse a payment (admin only) — never hard-delete financial records
-  const cancelPayment = useCallback((paymentId) => {
-    const target = payments.find(p => p.id === Number(paymentId));
-    if (!target) return Promise.reject(new Error('الدفعة غير موجودة'));
-    const reversed = { ...target, status: 'ملغاة', reversedAt: new Date().toISOString(), reversedBy: currentUser?.name || 'مشرف' };
-    return logFirestoreOp('setDoc', 'payments', String(paymentId), () =>
-      setDoc(doc(db, 'payments', String(paymentId)), reversed)
-    ).then(() => {
-      addAuditLog('عكس دفعة مالية', `تم عكس دفعة بقيمة ${target.amount || 0} ريال للعميل ${target.clientName || ''}`, '↩️');
-      
-      const invoice = invoices.find(inv => String(inv.invoiceNumber) === String(target.invoiceNumber));
-      let bookingId = target.bookingId;
-      if (invoice) {
-        if (!bookingId) bookingId = invoice.bookingId;
-        const relatedPayments = payments.filter(p => String(p.id) !== String(paymentId) && String(p.invoiceNumber) === String(invoice.invoiceNumber) && p.status !== 'ملغي' && p.status !== 'ملغاة');
-        const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-        
-        updateInvoice(invoice.id, {
-          paid: totalPaid,
-          status: totalPaid >= invoice.total ? 'مدفوعة' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوعة')
-        });
-
-        if (bookingId) {
-          const booking = bookings.find(b => String(b.id) === String(bookingId));
-          if (booking) {
-            const bPrice = Number(booking.totalPrice) || 0;
-            const remaining = Math.max(0, bPrice - totalPaid);
-            updateBooking(booking.id, {
-              paidAmount: totalPaid,
-              remainingAmount: remaining,
-              paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
-              financialStatus: remaining === 0 ? 'settled' : 'due'
-            });
-          }
-        }
-      } else if (bookingId) {
-        const booking = bookings.find(b => String(b.id) === String(bookingId));
-        if (booking) {
-          const relatedPayments = payments.filter(p => String(p.id) !== String(paymentId) && String(p.bookingId) === String(bookingId) && p.status !== 'ملغي' && p.status !== 'ملغاة');
-          const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-          const bPrice = Number(booking.totalPrice) || 0;
-          const remaining = Math.max(0, bPrice - totalPaid);
-          updateBooking(booking.id, {
-            paidAmount: totalPaid,
-            remainingAmount: remaining,
-            paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
-            financialStatus: remaining === 0 ? 'settled' : 'due'
-          });
-        }
-      }
-    }).catch(err => { console.warn('cancelPayment error:', err); throw err; });
-  }, [payments, currentUser, addAuditLog, logFirestoreOp, invoices, bookings, updateInvoice, updateBooking]);
+  }, [addAuditLog, logFirestoreOp]);
 
   const addExpense = useCallback((expenseData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(expenseData);
@@ -1103,68 +864,8 @@ export const AppProvider = ({ children }) => {
       id: Date.now()
     };
     logFirestoreOp('setDoc', 'expenses', String(newExpense.id), () => setDoc(doc(db, 'expenses', String(newExpense.id)), newExpense)).catch(err => console.warn('addExpense error:', err));
-    addAuditLog('تسجيل مصروفات', `تم تسجيل مصروف بقيمة ${sanitizedData.amount} ريال للجهة ${sanitizedData.recipient || ''}`, '💸');
+    addAuditLog('تسجيل مصروفات', `تم تسجيل مصروف بقيمة ${sanitizedData.amount} ريال`, '💸');
   }, [addAuditLog, logFirestoreOp]);
-
-  // Delete or cancel an expense
-  const deleteExpense = useCallback((expenseId) => {
-    const target = expenses.find(ex => ex.id === Number(expenseId));
-    if (!target) return Promise.reject(new Error('المصروف غير موجود'));
-    return logFirestoreOp('deleteDoc', 'expenses', String(expenseId), () =>
-      deleteDoc(doc(db, 'expenses', String(expenseId)))
-    ).then(() => {
-      addAuditLog('حذف مصروف', `تم حذف المصروف: ${target.description || target.category || target.title || ''} بقيمة ${target.amount || 0} ريال نهائياً`, '🗑️');
-    }).catch(err => { console.warn('deleteExpense error:', err); throw err; });
-  }, [expenses, addAuditLog, logFirestoreOp]);
-
-  const cancelExpense = useCallback((expenseId) => {
-    const target = expenses.find(ex => ex.id === Number(expenseId));
-    if (!target) return Promise.reject(new Error('المصروف غير موجود'));
-    const archived = { ...target, status: 'ملغاة', cancelledAt: new Date().toISOString(), cancelledBy: currentUser?.name || 'مشرف' };
-    return logFirestoreOp('setDoc', 'expenses', String(expenseId), () =>
-      setDoc(doc(db, 'expenses', String(expenseId)), archived)
-    ).then(() => {
-      addAuditLog('إلغاء مصروف', `تم إلغاء المصروف: ${target.description || target.category || target.title || ''} بقيمة ${target.amount || 0} ريال`, '🗑️');
-    }).catch(err => { console.warn('cancelExpense error:', err); throw err; });
-  }, [expenses, currentUser, addAuditLog, logFirestoreOp]);
-
-  const updatePayment = useCallback((paymentId, updatedFields) => {
-    const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
-    const target = payments.find(p => p.id === Number(paymentId));
-    if (target) {
-      const merged = { ...target, ...sanitizedFields };
-      logFirestoreOp('setDoc', 'payments', String(paymentId), () => setDoc(doc(db, 'payments', String(paymentId)), merged)).catch(err => console.warn('updatePayment error:', err));
-    }
-  }, [payments, logFirestoreOp]);
-
-  const updateExpense = useCallback((expenseId, updatedFields) => {
-    const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
-    const target = expenses.find(ex => ex.id === Number(expenseId));
-    if (target) {
-      const changes = [];
-      if (sanitizedFields.amount !== undefined && Number(sanitizedFields.amount) !== Number(target.amount)) {
-        changes.push(`المبلغ من ${target.amount} إلى ${sanitizedFields.amount}`);
-      }
-      if (sanitizedFields.title !== undefined && sanitizedFields.title !== target.title) {
-        changes.push(`البيان من "${target.title}" إلى "${sanitizedFields.title}"`);
-      }
-      if (sanitizedFields.category !== undefined && sanitizedFields.category !== target.category) {
-        changes.push(`التصنيف من "${target.category}" إلى "${sanitizedFields.category}"`);
-      }
-      if (sanitizedFields.status !== undefined && sanitizedFields.status !== target.status) {
-        changes.push(`الحالة من "${target.status}" إلى "${sanitizedFields.status}"`);
-      }
-
-      const merged = { ...target, ...sanitizedFields };
-      logFirestoreOp('setDoc', 'expenses', String(expenseId), () => setDoc(doc(db, 'expenses', String(expenseId)), merged))
-        .then(() => {
-          if (changes.length > 0) {
-            addAuditLog('تعديل مصروف', `تم تعديل المصروف #${expenseId}: ${changes.join(' | ')}`, '💸');
-          }
-        })
-        .catch(err => console.warn('updateExpense error:', err));
-    }
-  }, [expenses, addAuditLog, logFirestoreOp]);
 
   const updateSettings = useCallback((newSettings) => {
     const sanitizedSettings = sanitizeObjectToEnglishDigits(newSettings);
@@ -1474,22 +1175,13 @@ export const AppProvider = ({ children }) => {
         completeTask,
         addClient,
         updateClient,
-        deleteClient,
         addFreelancer,
         updateFreelancer,
-        deleteFreelancer,
         updateEquipment,
         addInvoice,
         updateInvoice,
-        cancelInvoice,
-        deleteInvoice,
         addPayment,
-        cancelPayment,
         addExpense,
-        deleteExpense,
-        cancelExpense,
-        updatePayment,
-        updateExpense,
         updateSettings,
         markNotificationAsRead,
         addAuditLog,

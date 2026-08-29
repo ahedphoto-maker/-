@@ -23,37 +23,129 @@ service cloud.firestore {
       );
     }
 
-    // Rules for Bookings collection
-    match /bookings/{bookingId} {
-      // Allow single booking read for any authenticated user (supporting client portal)
-      allow get: if isAuthenticated();
-      // Allow query/list and write operations only for logged-in team members
-      allow list, write: if isTeamMember();
+    // Helper: Check if a document ID matches the mock/test numeric IDs
+    function isMockId(id) {
+      return [
+        '1', '2', '3', '4', '5', '6', '7', '8', '9', '10',
+        '101', '102', '103', '104', '201', '202', '301', '302',
+        '501', '502', '503', '504', '505', '506', '601', '602', '603',
+        '701', '702', '703', '704', '801', '802', '901', '902',
+        '1001', '1002', '2001', '2002', '2003', '3001', '3002', '3003',
+        '7001', '8001', '8002'
+      ].hasAny([id]);
     }
 
-    // Rules for Team collection
+    // Bookings
+    match /bookings/{bookingId} {
+      allow get: if isAuthenticated();
+      allow list: if isTeamMember();
+      allow write: if isTeamMember() && !isMockId(bookingId);
+    }
+
+    // Team
     match /team/{memberId} {
-      allow read: if isAuthenticated(); // Allow reading team list for the login selector
+      allow read: if isAuthenticated();
       allow write: if isTeamMember();
     }
 
-    // Rules for Devices collection
+    // Devices
     match /devices/{deviceId} {
-      allow read, write: if isAuthenticated() && (
+      allow read, write: if isAuthenticated() && !isMockId(deviceId) && (
         request.auth.uid == (resource != null ? resource.data.userId : request.resource.data.userId) ||
         isAdmin()
       );
     }
 
-    // Rules for Settings collection
+    // Settings
     match /settings/{settingId} {
       allow read: if isAuthenticated();
       allow write: if isAdmin();
     }
 
-    // Default fallback rule for all other collections
-    match /{document=**} {
+    // Equipment
+    match /equipment/{eqId} {
       allow read, write: if isTeamMember();
+    }
+
+    // Custom Roles
+    match /customRoles/{roleId} {
+      allow read, write: if isTeamMember();
+    }
+
+    // Projects
+    match /projects/{projectId} {
+      allow read, write: if isTeamMember() && !isMockId(projectId);
+    }
+
+    // Tasks
+    match /tasks/{taskId} {
+      allow read, write: if isTeamMember() && !isMockId(taskId);
+    }
+
+    // Invoices
+    match /invoices/{invoiceId} {
+      allow read, write: if isTeamMember() && !isMockId(invoiceId);
+    }
+
+    // Payments
+    match /payments/{paymentId} {
+      allow read, write: if isTeamMember() && !isMockId(paymentId);
+    }
+
+    // Expenses
+    match /expenses/{expenseId} {
+      allow read, write: if isTeamMember() && !isMockId(expenseId);
+    }
+
+    // Audit Logs
+    match /auditLogs/{logId} {
+      allow read, write: if isTeamMember() && !isMockId(logId);
+    }
+
+    // Notifications
+    match /notifications/{notificationId} {
+      allow read, write: if isTeamMember() && !isMockId(notificationId);
+    }
+
+    // Contracts
+    match /contracts/{contractId} {
+      allow read, write: if isTeamMember() && !isMockId(contractId);
+    }
+
+    // Files
+    match /files/{fileId} {
+      allow read, write: if isTeamMember() && !isMockId(fileId);
+    }
+
+    // Quotations
+    match /quotations/{quotationId} {
+      allow read, write: if isTeamMember() && !isMockId(quotationId);
+    }
+
+    // Waitlist
+    match /waitlist/{waitlistId} {
+      allow read, write: if isTeamMember() && !isMockId(waitlistId);
+    }
+
+    // Clients
+    match /clients/{clientId} {
+      allow read, write: if isTeamMember() && !isMockId(clientId);
+    }
+
+    // Companies
+    match /companies/{companyId} {
+      allow read, write: if isTeamMember() && !isMockId(companyId);
+    }
+
+    // Freelancers
+    match /freelancers/{freelancerId} {
+      allow read, write: if isTeamMember() && !isMockId(freelancerId);
+    }
+
+    // Default fallback rule for any nested subcollections (Disallow writes in wildcard by default)
+    match /{document=**} {
+      allow read: if isTeamMember();
+      allow write: if false;
     }
   }
 }
