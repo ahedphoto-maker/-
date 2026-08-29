@@ -389,6 +389,76 @@ export const AppProvider = ({ children }) => {
   }, [currentUser, userRole, logFirestoreOp]);
 
   // Bookings CRUD
+  const syncBookingWithInvoice = useCallback((booking) => {
+    if (booking.totalPrice === null || booking.totalPrice === undefined) return;
+
+    const existingInvoice = invoices.find(inv => String(inv.bookingId) === String(booking.id));
+
+    const totalVal = Number(booking.totalPrice) || 0;
+    const subtotal = totalVal / 1.15;
+    const taxAmount = totalVal - subtotal;
+
+    // Calculate actual payments from existing payments linked to this booking/invoice
+    const relatedPayments = payments.filter(p => 
+      (String(p.bookingId) === String(booking.id) || (existingInvoice && String(p.invoiceNumber) === String(existingInvoice.invoiceNumber))) && 
+      p.status !== 'ملغي' && p.status !== 'ملغاة'
+    );
+    const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+
+    let statusVal = 'غير مدفوعة';
+    if (booking.status === 'ملغي' || booking.status === 'ملغاة') {
+      statusVal = 'ملغاة';
+    } else if (totalPaid >= totalVal) {
+      statusVal = 'مدفوعة';
+    } else if (totalPaid > 0) {
+      statusVal = 'جزئي';
+    }
+
+    if (existingInvoice) {
+      const updatedInvoice = {
+        ...existingInvoice,
+        clientName: booking.clientName || existingInvoice.clientName || '',
+        clientEmail: booking.clientEmail || existingInvoice.clientEmail || '',
+        total: totalVal,
+        subtotal: Number(subtotal.toFixed(2)),
+        taxAmount: Number(taxAmount.toFixed(2)),
+        paid: totalPaid,
+        status: statusVal,
+        items: [
+          { id: Date.now(), description: `تغطية خدمات تصوير - حجز رقم ${booking.bookingNumber}`, quantity: 1, price: totalVal }
+        ]
+      };
+      logFirestoreOp('setDoc', 'invoices', String(existingInvoice.id), () => setDoc(doc(db, 'invoices', String(existingInvoice.id)), updatedInvoice)).catch(err => {
+        console.warn('syncBookingWithInvoice update error:', err);
+      });
+    } else {
+      const newInvoiceId = Date.now();
+      const newInvoice = {
+        id: newInvoiceId,
+        invoiceNumber: `INV-2026-${Math.floor(Math.random() * 900) + 100}`,
+        clientName: booking.clientName || '',
+        clientEmail: booking.clientEmail || '',
+        bookingId: booking.id,
+        bookingNumber: booking.bookingNumber,
+        issueDate: booking.date || new Date().toISOString().substring(0, 10),
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().substring(0, 10),
+        subtotal: Number(subtotal.toFixed(2)),
+        taxRate: 15,
+        taxAmount: Number(taxAmount.toFixed(2)),
+        total: totalVal,
+        paid: totalPaid,
+        status: statusVal,
+        items: [
+          { id: Date.now(), description: `تغطية خدمات تصوير - حجز رقم ${booking.bookingNumber}`, quantity: 1, price: totalVal }
+        ],
+        notes: 'تلقائي من الحجز الأصلي'
+      };
+      logFirestoreOp('setDoc', 'invoices', String(newInvoiceId), () => setDoc(doc(db, 'invoices', String(newInvoiceId)), newInvoice)).catch(err => {
+        console.warn('syncBookingWithInvoice create error:', err);
+      });
+    }
+  }, [invoices, payments, logFirestoreOp]);
+
   const addBooking = useCallback((bookingData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(bookingData);
     const activeUid = auth.currentUser?.uid || 'anonymous';
@@ -489,6 +559,7 @@ export const AppProvider = ({ children }) => {
         showCelebration('تم إنشاء الحجز وتزامنه بنجاح! 🎉');
         newBookings.forEach(booking => {
           triggerNotificationEvent('booking_created', booking, currentUser);
+          syncBookingWithInvoice(booking);
         });
       })
       .catch(err => {
@@ -501,7 +572,7 @@ export const AppProvider = ({ children }) => {
       addAuditLog('إنشاء حجوزات متكررة', `تم إنشاء عدد ${newBookings.length} حجوزات متكررة لـ ${newBookings[0].title}`, '📅');
     }
     return newBookings[0];
-  }, [addAuditLog, currentUser, userRole, logFirestoreOp]);
+  }, [addAuditLog, currentUser, userRole, logFirestoreOp, syncBookingWithInvoice]);
 
   const updateBooking = useCallback((bookingId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
@@ -549,6 +620,7 @@ export const AppProvider = ({ children }) => {
 
     logFirestoreOp('setDoc', 'bookings', String(bookingId), () => setDoc(doc(db, 'bookings', String(bookingId)), merged))
       .then(() => {
+        syncBookingWithInvoice(merged);
         if (changes.length > 0) {
           triggerNotificationEvent('booking_updated', merged, currentUser);
         }
@@ -557,7 +629,7 @@ export const AppProvider = ({ children }) => {
         console.error(`Firestore write error [collection: bookings, action: update, doc: ${bookingId}]:`, err);
       });
     addAuditLog('تحديث حجز', `تم تعديل تفاصيل الحجز رقم ${bookingId}`, '📅');
-  }, [addAuditLog, bookings, currentUser, logFirestoreOp]);
+  }, [addAuditLog, bookings, currentUser, logFirestoreOp, syncBookingWithInvoice]);
 
   const deleteBooking = useCallback((bookingId) => {
     const target = bookings.find(b => b.id === Number(bookingId));
@@ -567,6 +639,7 @@ export const AppProvider = ({ children }) => {
       const updated = { ...target, status: 'ملغي' };
       logFirestoreOp('setDoc', 'bookings', String(bookingId), () => setDoc(doc(db, 'bookings', String(bookingId)), updated))
         .then(() => {
+          syncBookingWithInvoice(updated);
           triggerNotificationEvent('booking_cancelled', updated, currentUser);
         })
         .catch(err => {
@@ -580,12 +653,16 @@ export const AppProvider = ({ children }) => {
     logFirestoreOp('deleteDoc', 'bookings', String(bookingId), () => deleteDoc(doc(db, 'bookings', String(bookingId))))
       .then(() => {
         triggerNotificationEvent('booking_deleted', target, currentUser);
+        const linkedInvoice = invoices.find(inv => String(inv.bookingId) === String(bookingId));
+        if (linkedInvoice) {
+          cancelInvoice(linkedInvoice.id).catch(() => {});
+        }
       })
       .catch(err => {
         console.error(`Firestore delete error [collection: bookings, doc: ${bookingId}]:`, err);
       });
     addAuditLog('حذف حجز', `تم إزالة الحجز رقم ${bookingId}`, '❌');
-  }, [addAuditLog, bookings, currentUser, logFirestoreOp]);
+  }, [addAuditLog, bookings, currentUser, logFirestoreOp, syncBookingWithInvoice, invoices, cancelInvoice]);
 
   // Tasks CRUD
   const addTask = useCallback((taskData) => {
@@ -867,10 +944,27 @@ export const AppProvider = ({ children }) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
     const target = invoices.find(inv => inv.id === Number(invoiceId));
     if (target) {
+      const changes = [];
+      if (sanitizedFields.total !== undefined && Number(sanitizedFields.total) !== Number(target.total)) {
+        changes.push(`الإجمالي من ${target.total} إلى ${sanitizedFields.total}`);
+      }
+      if (sanitizedFields.paid !== undefined && Number(sanitizedFields.paid) !== Number(target.paid)) {
+        changes.push(`المدفوع من ${target.paid} إلى ${sanitizedFields.paid}`);
+      }
+      if (sanitizedFields.status !== undefined && sanitizedFields.status !== target.status) {
+        changes.push(`الحالة من "${target.status}" إلى "${sanitizedFields.status}"`);
+      }
+      
       const merged = { ...target, ...sanitizedFields };
-      logFirestoreOp('setDoc', 'invoices', String(invoiceId), () => setDoc(doc(db, 'invoices', String(invoiceId)), merged)).catch(err => console.warn('updateInvoice error:', err));
+      logFirestoreOp('setDoc', 'invoices', String(invoiceId), () => setDoc(doc(db, 'invoices', String(invoiceId)), merged))
+        .then(() => {
+          if (changes.length > 0) {
+            addAuditLog('تحديث فاتورة', `تم تعديل الفاتورة رقم ${target.invoiceNumber || invoiceId}: ${changes.join(' | ')}`, '📄');
+          }
+        })
+        .catch(err => console.warn('updateInvoice error:', err));
     }
-  }, [invoices, logFirestoreOp]);
+  }, [invoices, addAuditLog, logFirestoreOp]);
 
   // Archive (cancel) invoice - never hard-delete to preserve financial history
   const cancelInvoice = useCallback((invoiceId) => {
@@ -884,16 +978,70 @@ export const AppProvider = ({ children }) => {
     }).catch(err => { console.warn('cancelInvoice error:', err); throw err; });
   }, [invoices, currentUser, addAuditLog, logFirestoreOp]);
 
+  const deleteInvoice = useCallback((invoiceId) => {
+    const target = invoices.find(inv => inv.id === Number(invoiceId));
+    if (!target) return Promise.reject(new Error('الفاتورة غير موجودة'));
+    return logFirestoreOp('deleteDoc', 'invoices', String(invoiceId), () =>
+      deleteDoc(doc(db, 'invoices', String(invoiceId)))
+    ).then(() => {
+      addAuditLog('حذف فاتورة نهائياً', `تم حذف الفاتورة رقم ${target.invoiceNumber || invoiceId} بقيمة ${target.total || 0} ريال نهائياً`, '🗑️');
+    }).catch(err => { console.warn('deleteInvoice error:', err); throw err; });
+  }, [invoices, addAuditLog, logFirestoreOp]);
+
   const addPayment = useCallback((paymentData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(paymentData);
     const newPayment = {
       ...sanitizedData,
-      id: Date.now()
+      id: Date.now(),
+      status: sanitizedData.status || 'نشط'
     };
-    logFirestoreOp('setDoc', 'payments', String(newPayment.id), () => setDoc(doc(db, 'payments', String(newPayment.id)), newPayment)).catch(err => console.warn('addPayment error:', err));
-    addAuditLog('تسجيل دفعة', `تم تسجيل دفعة بقيمة ${sanitizedData.amount} ريال`, '💰');
+    logFirestoreOp('setDoc', 'payments', String(newPayment.id), () => setDoc(doc(db, 'payments', String(newPayment.id)), newPayment))
+      .then(() => {
+        let bookingId = sanitizedData.bookingId;
+        const invoice = invoices.find(inv => String(inv.invoiceNumber) === String(sanitizedData.invoiceNumber));
+        if (invoice) {
+          if (!bookingId) bookingId = invoice.bookingId;
+          const relatedPayments = [...payments, newPayment].filter(p => String(p.invoiceNumber) === String(invoice.invoiceNumber) && p.status !== 'ملغي' && p.status !== 'ملغاة');
+          const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+          
+          updateInvoice(invoice.id, {
+            paid: totalPaid,
+            status: totalPaid >= invoice.total ? 'مدفوعة' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوعة')
+          });
+
+          if (bookingId) {
+            const booking = bookings.find(b => String(b.id) === String(bookingId));
+            if (booking) {
+              const bPrice = Number(booking.totalPrice) || 0;
+              const remaining = Math.max(0, bPrice - totalPaid);
+              updateBooking(booking.id, {
+                paidAmount: totalPaid,
+                remainingAmount: remaining,
+                paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
+                financialStatus: remaining === 0 ? 'settled' : 'due'
+              });
+            }
+          }
+        } else if (bookingId) {
+          const booking = bookings.find(b => String(b.id) === String(bookingId));
+          if (booking) {
+            const relatedPayments = [...payments, newPayment].filter(p => String(p.bookingId) === String(bookingId) && p.status !== 'ملغي' && p.status !== 'ملغاة');
+            const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+            const bPrice = Number(booking.totalPrice) || 0;
+            const remaining = Math.max(0, bPrice - totalPaid);
+            updateBooking(booking.id, {
+              paidAmount: totalPaid,
+              remainingAmount: remaining,
+              paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
+              financialStatus: remaining === 0 ? 'settled' : 'due'
+            });
+          }
+        }
+      })
+      .catch(err => console.warn('addPayment error:', err));
+    addAuditLog('تسجيل دفعة', `تم تسجيل دفعة بقيمة ${sanitizedData.amount} ريال للعميل ${sanitizedData.clientName || ''}`, '💰');
     showCelebration('تم تسجيل الدفعة المالية بنجاح! 💰');
-  }, [addAuditLog, logFirestoreOp]);
+  }, [addAuditLog, logFirestoreOp, invoices, payments, bookings, updateInvoice, updateBooking]);
 
   // Reverse a payment (admin only) — never hard-delete financial records
   const cancelPayment = useCallback((paymentId) => {
@@ -904,8 +1052,49 @@ export const AppProvider = ({ children }) => {
       setDoc(doc(db, 'payments', String(paymentId)), reversed)
     ).then(() => {
       addAuditLog('عكس دفعة مالية', `تم عكس دفعة بقيمة ${target.amount || 0} ريال للعميل ${target.clientName || ''}`, '↩️');
+      
+      const invoice = invoices.find(inv => String(inv.invoiceNumber) === String(target.invoiceNumber));
+      let bookingId = target.bookingId;
+      if (invoice) {
+        if (!bookingId) bookingId = invoice.bookingId;
+        const relatedPayments = payments.filter(p => String(p.id) !== String(paymentId) && String(p.invoiceNumber) === String(invoice.invoiceNumber) && p.status !== 'ملغي' && p.status !== 'ملغاة');
+        const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+        
+        updateInvoice(invoice.id, {
+          paid: totalPaid,
+          status: totalPaid >= invoice.total ? 'مدفوعة' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوعة')
+        });
+
+        if (bookingId) {
+          const booking = bookings.find(b => String(b.id) === String(bookingId));
+          if (booking) {
+            const bPrice = Number(booking.totalPrice) || 0;
+            const remaining = Math.max(0, bPrice - totalPaid);
+            updateBooking(booking.id, {
+              paidAmount: totalPaid,
+              remainingAmount: remaining,
+              paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
+              financialStatus: remaining === 0 ? 'settled' : 'due'
+            });
+          }
+        }
+      } else if (bookingId) {
+        const booking = bookings.find(b => String(b.id) === String(bookingId));
+        if (booking) {
+          const relatedPayments = payments.filter(p => String(p.id) !== String(paymentId) && String(p.bookingId) === String(bookingId) && p.status !== 'ملغي' && p.status !== 'ملغاة');
+          const totalPaid = relatedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+          const bPrice = Number(booking.totalPrice) || 0;
+          const remaining = Math.max(0, bPrice - totalPaid);
+          updateBooking(booking.id, {
+            paidAmount: totalPaid,
+            remainingAmount: remaining,
+            paymentStatus: remaining === 0 ? 'مدفوع' : (totalPaid > 0 ? 'جزئي' : 'غير مدفوع'),
+            financialStatus: remaining === 0 ? 'settled' : 'due'
+          });
+        }
+      }
     }).catch(err => { console.warn('cancelPayment error:', err); throw err; });
-  }, [payments, currentUser, addAuditLog, logFirestoreOp]);
+  }, [payments, currentUser, addAuditLog, logFirestoreOp, invoices, bookings, updateInvoice, updateBooking]);
 
   const addExpense = useCallback((expenseData) => {
     const sanitizedData = sanitizeObjectToEnglishDigits(expenseData);
@@ -914,7 +1103,7 @@ export const AppProvider = ({ children }) => {
       id: Date.now()
     };
     logFirestoreOp('setDoc', 'expenses', String(newExpense.id), () => setDoc(doc(db, 'expenses', String(newExpense.id)), newExpense)).catch(err => console.warn('addExpense error:', err));
-    addAuditLog('تسجيل مصروفات', `تم تسجيل مصروف بقيمة ${sanitizedData.amount} ريال`, '💸');
+    addAuditLog('تسجيل مصروفات', `تم تسجيل مصروف بقيمة ${sanitizedData.amount} ريال للجهة ${sanitizedData.recipient || ''}`, '💸');
   }, [addAuditLog, logFirestoreOp]);
 
   // Delete or cancel an expense
@@ -924,9 +1113,20 @@ export const AppProvider = ({ children }) => {
     return logFirestoreOp('deleteDoc', 'expenses', String(expenseId), () =>
       deleteDoc(doc(db, 'expenses', String(expenseId)))
     ).then(() => {
-      addAuditLog('حذف مصروف', `تم حذف المصروف: ${target.description || target.category || ''} بقيمة ${target.amount || 0} ريال`, '🗑️');
+      addAuditLog('حذف مصروف', `تم حذف المصروف: ${target.description || target.category || target.title || ''} بقيمة ${target.amount || 0} ريال نهائياً`, '🗑️');
     }).catch(err => { console.warn('deleteExpense error:', err); throw err; });
   }, [expenses, addAuditLog, logFirestoreOp]);
+
+  const cancelExpense = useCallback((expenseId) => {
+    const target = expenses.find(ex => ex.id === Number(expenseId));
+    if (!target) return Promise.reject(new Error('المصروف غير موجود'));
+    const archived = { ...target, status: 'ملغاة', cancelledAt: new Date().toISOString(), cancelledBy: currentUser?.name || 'مشرف' };
+    return logFirestoreOp('setDoc', 'expenses', String(expenseId), () =>
+      setDoc(doc(db, 'expenses', String(expenseId)), archived)
+    ).then(() => {
+      addAuditLog('إلغاء مصروف', `تم إلغاء المصروف: ${target.description || target.category || target.title || ''} بقيمة ${target.amount || 0} ريال`, '🗑️');
+    }).catch(err => { console.warn('cancelExpense error:', err); throw err; });
+  }, [expenses, currentUser, addAuditLog, logFirestoreOp]);
 
   const updatePayment = useCallback((paymentId, updatedFields) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
@@ -941,10 +1141,30 @@ export const AppProvider = ({ children }) => {
     const sanitizedFields = sanitizeObjectToEnglishDigits(updatedFields);
     const target = expenses.find(ex => ex.id === Number(expenseId));
     if (target) {
+      const changes = [];
+      if (sanitizedFields.amount !== undefined && Number(sanitizedFields.amount) !== Number(target.amount)) {
+        changes.push(`المبلغ من ${target.amount} إلى ${sanitizedFields.amount}`);
+      }
+      if (sanitizedFields.title !== undefined && sanitizedFields.title !== target.title) {
+        changes.push(`البيان من "${target.title}" إلى "${sanitizedFields.title}"`);
+      }
+      if (sanitizedFields.category !== undefined && sanitizedFields.category !== target.category) {
+        changes.push(`التصنيف من "${target.category}" إلى "${sanitizedFields.category}"`);
+      }
+      if (sanitizedFields.status !== undefined && sanitizedFields.status !== target.status) {
+        changes.push(`الحالة من "${target.status}" إلى "${sanitizedFields.status}"`);
+      }
+
       const merged = { ...target, ...sanitizedFields };
-      logFirestoreOp('setDoc', 'expenses', String(expenseId), () => setDoc(doc(db, 'expenses', String(expenseId)), merged)).catch(err => console.warn('updateExpense error:', err));
+      logFirestoreOp('setDoc', 'expenses', String(expenseId), () => setDoc(doc(db, 'expenses', String(expenseId)), merged))
+        .then(() => {
+          if (changes.length > 0) {
+            addAuditLog('تعديل مصروف', `تم تعديل المصروف #${expenseId}: ${changes.join(' | ')}`, '💸');
+          }
+        })
+        .catch(err => console.warn('updateExpense error:', err));
     }
-  }, [expenses, logFirestoreOp]);
+  }, [expenses, addAuditLog, logFirestoreOp]);
 
   const updateSettings = useCallback((newSettings) => {
     const sanitizedSettings = sanitizeObjectToEnglishDigits(newSettings);
@@ -1262,10 +1482,12 @@ export const AppProvider = ({ children }) => {
         addInvoice,
         updateInvoice,
         cancelInvoice,
+        deleteInvoice,
         addPayment,
         cancelPayment,
         addExpense,
         deleteExpense,
+        cancelExpense,
         updatePayment,
         updateExpense,
         updateSettings,

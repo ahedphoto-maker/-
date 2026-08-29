@@ -32,6 +32,12 @@ export const BookingsView = () => {
     isLoadingBookings
   } = useApp();
 
+  const isSuper = userRole === 'admin' || 
+                  (currentUser && (
+                    currentUser.isSupervisor === true || 
+                    currentUser.id === 1 || 
+                    (currentUser.role && (currentUser.role.includes('مدير') || currentUser.role.includes('مشرف')))
+                  ));
   const [activeTab, setActiveTab] = useState('bookings'); // 'bookings' | 'statements' | 'collaborations'
   const [isMobile, setIsMobile] = useState(() => window.innerWidth <= 768);
   
@@ -121,6 +127,10 @@ export const BookingsView = () => {
   };
 
   const handleQuickAddPrice = (b) => {
+    if (!isSuper) {
+      alert('عذراً، لا تملك صلاحية تعديل السعر.');
+      return;
+    }
     const priceStr = prompt('أدخل السعر / قيمة الاتفاق بالريال (أرقام إنجليزية فقط):', b.totalPrice !== null ? b.totalPrice : '');
     if (priceStr === null) return; // cancel click
     
@@ -968,6 +978,31 @@ export const BookingsView = () => {
                               </span>
                             )}
                             <span style={{ padding: '2px 8px', borderRadius: '4px', fontSize: '0.66rem', fontWeight: 800, backgroundColor: `${getStatusColor(b.status)}15`, color: getStatusColor(b.status) }}>{b.status || 'مؤكد'}</span>
+                            {userRole === 'admin' && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteBookingClick(b);
+                                }}
+                                style={{
+                                  background: 'transparent',
+                                  border: 'none',
+                                  color: '#ef4444',
+                                  cursor: 'pointer',
+                                  padding: '4px',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  borderRadius: '6px',
+                                  transition: 'background 0.15s'
+                                }}
+                                onMouseEnter={e => e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.08)'}
+                                onMouseLeave={e => e.currentTarget.style.backgroundColor = 'transparent'}
+                                title="🗑️ حذف الحجز نهائياً"
+                              >
+                                <Icons.Trash2 size={16} />
+                              </button>
+                            )}
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1035,45 +1070,47 @@ export const BookingsView = () => {
                         </div>
 
                         {/* Financial Status Summary */}
-                        <div style={{ 
-                          display: 'flex', 
-                          justifyContent: 'space-between', 
-                          alignItems: 'center', 
-                          backgroundColor: 'var(--bg-main)', 
-                          padding: '8px 12px', 
-                          borderRadius: '8px', 
-                          fontSize: '0.78rem'
-                        }}>
-                          {b.totalPrice === null || b.totalPrice === undefined || b.financialStatus === 'no_price' ? (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontWeight: 900 }}>
-                              <Icons.AlertCircle size={14} color="#ef4444" style={{ animation: 'pulse 2s infinite' }} />
-                              <span>⚠️ السعر غير محدد</span>
-                            </div>
-                          ) : (
-                            <div style={{ display: 'flex', gap: '12px' }}>
-                              <div>
-                                <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>السعر:</span>{' '}
-                                <strong style={{ fontFamily: 'Inter, sans-serif' }}>{formatCurrency(b.totalPrice)}</strong>
-                              </div>
-                              {b.remainingAmount > 0 && (
-                                <div>
-                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>المتبقي:</span>{' '}
-                                  <strong style={{ color: '#ef4444', fontFamily: 'Inter, sans-serif' }}>{formatCurrency(b.remainingAmount)}</strong>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                          <span style={{ 
-                            padding: '2px 8px', 
-                            borderRadius: '4px', 
-                            fontSize: '0.68rem', 
-                            fontWeight: 900, 
-                            backgroundColor: b.paymentStatus === 'مدفوع' ? 'rgba(16, 185, 129, 0.12)' : (b.paymentStatus === 'جزئي' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
-                            color: b.paymentStatus === 'مدفوع' ? '#10b981' : (b.paymentStatus === 'جزئي' ? '#f59e0b' : '#ef4444')
+                        {isSuper && (
+                          <div style={{ 
+                            display: 'flex', 
+                            justifyContent: 'space-between', 
+                            alignItems: 'center', 
+                            backgroundColor: 'var(--bg-main)', 
+                            padding: '8px 12px', 
+                            borderRadius: '8px', 
+                            fontSize: '0.78rem'
                           }}>
-                            {b.paymentStatus || 'غير مدفوع'}
-                          </span>
-                        </div>
+                            {b.totalPrice === null || b.totalPrice === undefined || b.financialStatus === 'no_price' ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#ef4444', fontWeight: 900 }}>
+                                <Icons.AlertCircle size={14} color="#ef4444" style={{ animation: 'pulse 2s infinite' }} />
+                                <span>⚠️ السعر غير محدد</span>
+                              </div>
+                            ) : (
+                              <div style={{ display: 'flex', gap: '12px' }}>
+                                <div>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>السعر:</span>{' '}
+                                  <strong style={{ fontFamily: 'Inter, sans-serif' }}>{formatCurrency(b.totalPrice)}</strong>
+                                </div>
+                                {b.remainingAmount > 0 && (
+                                  <div>
+                                    <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>المتبقي:</span>{' '}
+                                    <strong style={{ color: '#ef4444', fontFamily: 'Inter, sans-serif' }}>{formatCurrency(b.remainingAmount)}</strong>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            <span style={{ 
+                              padding: '2px 8px', 
+                              borderRadius: '4px', 
+                              fontSize: '0.68rem', 
+                              fontWeight: 900, 
+                              backgroundColor: b.paymentStatus === 'مدفوع' ? 'rgba(16, 185, 129, 0.12)' : (b.paymentStatus === 'جزئي' ? 'rgba(245, 158, 11, 0.12)' : 'rgba(239, 68, 68, 0.12)'),
+                              color: b.paymentStatus === 'مدفوع' ? '#10b981' : (b.paymentStatus === 'جزئي' ? '#f59e0b' : '#ef4444')
+                            }}>
+                              {b.paymentStatus || 'غير مدفوع'}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Card Footer Actions */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid var(--border-color)', paddingTop: '10px', marginTop: '2px' }}>
@@ -1272,12 +1309,18 @@ export const BookingsView = () => {
 
                         {/* 6. Finance */}
                         <div style={{ width: '12%', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                          <span style={{ fontSize: '0.82rem', fontWeight: 900 }}>
-                            {b.totalPrice === null ? <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>السعر غير محدد</span> : formatCurrency(b.totalPrice)}
-                          </span>
-                          <div style={{ display: 'flex' }}>
-                            {renderFinancialStatusIcon(b)}
-                          </div>
+                          {isSuper ? (
+                            <>
+                              <span style={{ fontSize: '0.82rem', fontWeight: 900 }}>
+                                {b.totalPrice === null ? <span style={{ color: 'var(--text-muted)', fontSize: '0.72rem' }}>السعر غير محدد</span> : formatCurrency(b.totalPrice)}
+                              </span>
+                              <div style={{ display: 'flex' }}>
+                                {renderFinancialStatusIcon(b)}
+                              </div>
+                            </>
+                          ) : (
+                            <span style={{ color: 'var(--text-muted)', fontSize: '0.74rem' }}>-</span>
+                          )}
                         </div>
 
                         {/* 7. Status badge */}
@@ -1293,7 +1336,17 @@ export const BookingsView = () => {
                         </div>
 
                         {/* 8. Quick Actions Menu */}
-                        <div style={{ width: '10%', textAlign: 'center', position: 'relative' }}>
+                        <div style={{ width: '10%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', position: 'relative' }} onClick={e => e.stopPropagation()}>
+                          {userRole === 'admin' && (
+                            <button
+                              onClick={() => handleDeleteBookingClick(b)}
+                              className="btn btn-secondary btn-icon"
+                              style={{ width: '30px', height: '30px', padding: 0, color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239, 68, 68, 0.03)' }}
+                              title="🗑️ حذف الحجز نهائياً"
+                            >
+                              <Icons.Trash2 size={14} />
+                            </button>
+                          )}
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -1623,29 +1676,31 @@ export const BookingsView = () => {
                   </div>
 
                   {/* Financial view in side panel (Requirement 10) */}
-                  <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
-                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>موقف الاتفاق المالي:</span>
-                    {privacyMode ? (
-                      <strong style={{ color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>[ وضع الخصوصية مفعل ] 🔒</strong>
-                    ) : drawerBooking.totalPrice === null ? (
-                      <strong style={{ color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>السعر غير محدد ⚠️</strong>
-                    ) : (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginTop: '6px', textAlign: 'center' }}>
-                        <div>
-                          <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>الإجمالي:</span>
-                          <strong style={{ display: 'block', fontSize: '0.8rem' }}>{formatCurrency(drawerBooking.totalPrice)}</strong>
+                  {isSuper && (
+                    <div style={{ padding: '12px', borderRadius: '8px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>موقف الاتفاق المالي:</span>
+                      {privacyMode ? (
+                        <strong style={{ color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>[ وضع الخصوصية مفعل ] 🔒</strong>
+                      ) : drawerBooking.totalPrice === null ? (
+                        <strong style={{ color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>السعر غير محدد ⚠️</strong>
+                      ) : (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '6px', marginTop: '6px', textAlign: 'center' }}>
+                          <div>
+                            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>الإجمالي:</span>
+                            <strong style={{ display: 'block', fontSize: '0.8rem' }}>{formatCurrency(drawerBooking.totalPrice)}</strong>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>المدفوع:</span>
+                            <strong style={{ display: 'block', fontSize: '0.8rem', color: '#10b981' }}>{formatCurrency(drawerBooking.paidAmount || 0)}</strong>
+                          </div>
+                          <div>
+                            <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>المتبقي:</span>
+                            <strong style={{ display: 'block', fontSize: '0.8rem', color: '#ef4444' }}>{formatCurrency(drawerBooking.remainingAmount || 0)}</strong>
+                          </div>
                         </div>
-                        <div>
-                          <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>المدفوع:</span>
-                          <strong style={{ display: 'block', fontSize: '0.8rem', color: '#10b981' }}>{formatCurrency(drawerBooking.paidAmount || 0)}</strong>
-                        </div>
-                        <div>
-                          <span style={{ fontSize: '0.64rem', color: 'var(--text-muted)' }}>المتبقي:</span>
-                          <strong style={{ display: 'block', fontSize: '0.8rem', color: '#ef4444' }}>{formatCurrency(drawerBooking.remainingAmount || 0)}</strong>
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                      )}
+                    </div>
+                  )}
 
                   {drawerBooking.optionalNote && (
                     <div>
@@ -1835,13 +1890,15 @@ export const BookingsView = () => {
           <Icons.CheckSquare size={13} color="#64748b" />
           <span>إكمال الجلسة</span>
         </button>
-        <button onClick={() => {
-          handleQuickAddPrice(b);
-          setActiveMenuId(null);
-        }} style={dropdownItemStyle}>
-          <Icons.Coins size={13} color="var(--primary-color)" />
-          <span>{b.totalPrice === null || b.totalPrice === undefined || b.totalPrice === '' ? '💰 إضافة السعر' : '✏️ تعديل السعر'}</span>
-        </button>
+        {isSuper && (
+          <button onClick={() => {
+            handleQuickAddPrice(b);
+            setActiveMenuId(null);
+          }} style={dropdownItemStyle}>
+            <Icons.Coins size={13} color="var(--primary-color)" />
+            <span>{b.totalPrice === null || b.totalPrice === undefined || b.totalPrice === '' ? '💰 إضافة السعر' : '✏️ تعديل السعر'}</span>
+          </button>
+        )}
         <div style={{ padding: '4px 10px', borderBottom: '1px solid var(--border-color)' }}>
           <span style={{ fontSize: '0.62rem', color: 'var(--text-muted)', display: 'block', marginBottom: '2px' }}>تعيين الموظف:</span>
           <select

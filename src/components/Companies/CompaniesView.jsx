@@ -4,7 +4,13 @@ import { formatCurrency } from '../../utils/helpers';
 import * as Icons from 'lucide-react';
 
 export const CompaniesView = () => {
-  const { companies, setCompanies } = useApp();
+  const { companies, setCompanies, userRole, currentUser } = useApp();
+  const isSuper = userRole === 'admin' || 
+                  (currentUser && (
+                    currentUser.isSupervisor === true || 
+                    currentUser.id === 1 || 
+                    (currentUser.role && (currentUser.role.includes('مدير') || currentUser.role.includes('مشرف')))
+                  ));
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newCompany, setNewCompany] = useState({ name: '', logo: '🏢', contactPerson: '', phone: '', email: '' });
 
@@ -47,10 +53,12 @@ export const CompaniesView = () => {
             </div>
 
             <div style={{ paddingTop: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>إجمالي إيراد العقود:</span>
-                <p style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary-color)' }}>{formatCurrency(c.totalRevenue || 0)}</p>
-              </div>
+              {isSuper && (
+                <div>
+                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>إجمالي إيراد العقود:</span>
+                  <p style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--primary-color)' }}>{formatCurrency(c.totalRevenue || 0)}</p>
+                </div>
+              )}
               <span className="badge badge-purple">{c.projectsCount || 0} مشاريع</span>
             </div>
           </div>

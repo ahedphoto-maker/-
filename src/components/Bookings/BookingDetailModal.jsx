@@ -3,6 +3,7 @@ import { useApp } from '../../context/AppContext';
 import { StatusBadge } from '../Common/StatusBadge';
 import { formatCurrency, formatBookingNumber, formatTime12h } from '../../utils/helpers';
 import * as Icons from 'lucide-react';
+import { ConfirmDeleteModal } from '../Common/ConfirmDeleteModal';
 
 export const BookingDetailModal = () => {
   const {
@@ -13,14 +14,29 @@ export const BookingDetailModal = () => {
     team,
     equipment,
     updateBooking,
-    setIsPaymentModalOpen
+    setIsPaymentModalOpen,
+    deleteBooking,
+    userRole,
+    currentUser
   } = useApp();
+
+  const isSuper = userRole === 'admin' || 
+                  (currentUser && (
+                    currentUser.isSupervisor === true || 
+                    currentUser.id === 1 || 
+                    (currentUser.role && (currentUser.role.includes('مدير') || currentUser.role.includes('مشرف')))
+                  ));
 
   // Local state for WhatsApp messages popup
   const [isMsgModalOpen, setIsMsgModalOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('ready');
   const [messageText, setMessageText] = useState('');
   const [phoneOverride, setPhoneOverride] = useState('');
+
+  // Local state for delete confirmation
+  const [localDeleteOpen, setLocalDeleteOpen] = useState(false);
+  const [localDeleteLoading, setLocalDeleteLoading] = useState(false);
+  const [localDeleteError, setLocalDeleteError] = useState('');
 
   // Settle active booking state from context to reflect changes instantly
   const currentBooking = bookings?.find(b => b.id === selectedBooking?.id) || selectedBooking;
@@ -148,6 +164,26 @@ export const BookingDetailModal = () => {
 
     window.open(`https://wa.me/${targetPhone}?text=${encodedText}`, '_blank');
     setIsMsgModalOpen(false);
+  };
+
+  const handleDeleteBookingClick = () => {
+    setLocalDeleteError('');
+    setLocalDeleteOpen(true);
+  };
+
+  const handleDeleteBookingConfirm = async () => {
+    if (!currentBooking) return;
+    setLocalDeleteLoading(true);
+    setLocalDeleteError('');
+    try {
+      await Promise.resolve(deleteBooking(currentBooking.id));
+      setLocalDeleteOpen(false);
+      setIsBookingDetailOpen(false);
+    } catch (err) {
+      setLocalDeleteError('فشل الحذف. يرجى المحاولة مرة أخرى.');
+    } finally {
+      setLocalDeleteLoading(false);
+    }
   };
 
   return (
@@ -380,94 +416,116 @@ export const BookingDetailModal = () => {
           )}
 
           {/* Financial Breakdown Section */}
-          <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
-            <h4 style={{ fontSize: '0.9rem', fontWeight: 900, marginBottom: '10px', color: '#065f46', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Icons.Coins size={16} />
-              <span>💰 البيانات والاتفاق المالي للحجز</span>
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
-              <div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>طريقة المحاسبة:</span>
-                <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
-                  {currentBooking.pricingType === 'monthly' || currentBooking.isMonthlyAccount ? 'حساب شهري تجميعي' : (currentBooking.pricingType === 'none' ? 'غير محدد حالياً' : 'لكل مهمة')}
-                </p>
+          {isSuper && (
+            <div style={{ padding: '16px', borderRadius: '12px', backgroundColor: 'rgba(16, 185, 129, 0.04)', border: '1px solid rgba(16, 185, 129, 0.15)' }}>
+              <h4 style={{ fontSize: '0.9rem', fontWeight: 900, marginBottom: '10px', color: '#065f46', margin: '0 0 10px 0', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Icons.Coins size={16} />
+                <span>💰 البيانات والاتفاق المالي للحجز</span>
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px' }}>
+                <div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>طريقة المحاسبة:</span>
+                  <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
+                    {currentBooking.pricingType === 'monthly' || currentBooking.isMonthlyAccount ? 'حساب شهري تجميعي' : (currentBooking.pricingType === 'none' ? 'غير حدد حالياً' : 'لكل مهمة')}
+                  </p>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>المبلغ الإجمالي:</span>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', margin: '4px 0 0 0' }}>{formatCurrency(currentBooking.totalPrice)}</p>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>المدفوع:</span>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981', margin: '4px 0 0 0' }}>{formatCurrency(currentBooking.paidAmount || 0)}</p>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>المتبقي للتحصيل:</span>
+                  <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ef4444', margin: '4px 0 0 0' }}>{currentBooking.totalPrice === null ? 'السعر غير محدد' : formatCurrency(currentBooking.remainingAmount || 0)}</p>
+                </div>
               </div>
-              <div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>المبلغ الإجمالي:</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: 'var(--text-main)', margin: '4px 0 0 0' }}>{formatCurrency(currentBooking.totalPrice)}</p>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>المدفوع:</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#10b981', margin: '4px 0 0 0' }}>{formatCurrency(currentBooking.paidAmount || 0)}</p>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>المتبقي للتحصيل:</span>
-                <p style={{ fontSize: '1.1rem', fontWeight: 800, color: '#ef4444', margin: '4px 0 0 0' }}>{currentBooking.totalPrice === null ? 'السعر غير محدد' : formatCurrency(currentBooking.remainingAmount || 0)}</p>
-              </div>
-            </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginTop: '10px', borderTop: '1px dashed rgba(16, 185, 129, 0.2)', paddingTop: '10px' }}>
-              {currentBooking.bookingType === 'freelancer' && (
-                <>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>نوع الحساب:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>فريلانسر (يومية)</p>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>سعر اليوم المحدّد:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
-                      {currentBooking.totalPrice ? formatCurrency(currentBooking.totalPrice) : 'غير محدد'}
-                    </p>
-                  </div>
-                </>
-              )}
-              {currentBooking.bookingType === 'company' && (
-                <>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>رقم الفاتورة:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>{currentBooking.invoiceNumber || 'غير متاح'}</p>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>حالة الفاتورة:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>{currentBooking.invoiceStatus || 'غير متاح'}</p>
-                  </div>
-                </>
-              )}
-              {currentBooking.bookingType === 'partnership' && (
-                <>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>نوع الاتفاق:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>شراكة استراتيجية</p>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>قيمة أو نسبة الشراكة:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
-                      {currentBooking.totalPrice ? formatCurrency(currentBooking.totalPrice) : 'غير محدد'}
-                    </p>
-                  </div>
-                </>
-              )}
-              {(!currentBooking.bookingType || currentBooking.bookingType === 'client') && (
-                <>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>رقم الفاتورة:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>{currentBooking.invoiceNumber || 'لا توجد فاتورة'}</p>
-                  </div>
-                  <div>
-                    <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>حالة التسوية:</span>
-                    <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
-                      {currentBooking.financialStatus === 'settled' ? 'تمت التسوية بالكامل' : 'معلّق / مستحق'}
-                    </p>
-                  </div>
-                </>
-              )}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '12px', marginTop: '10px', borderTop: '1px dashed rgba(16, 185, 129, 0.2)', paddingTop: '10px' }}>
+                {currentBooking.bookingType === 'freelancer' && (
+                  <>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>نوع الحساب:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>فريلانسر (يومية)</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>سعر اليوم المحدّد:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
+                        {currentBooking.totalPrice ? formatCurrency(currentBooking.totalPrice) : 'غير محدد'}
+                      </p>
+                    </div>
+                  </>
+                )}
+                {currentBooking.bookingType === 'company' && (
+                  <>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>رقم الفاتورة:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>{currentBooking.invoiceNumber || 'غير متاح'}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>حالة الفاتورة:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>{currentBooking.invoiceStatus || 'غير متاح'}</p>
+                    </div>
+                  </>
+                )}
+                {currentBooking.bookingType === 'partnership' && (
+                  <>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>نوع الاتفاق:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>شراكة استراتيجية</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>قيمة أو نسبة الشراكة:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
+                        {currentBooking.totalPrice ? formatCurrency(currentBooking.totalPrice) : 'غير محدد'}
+                      </p>
+                    </div>
+                  </>
+                )}
+                {(!currentBooking.bookingType || currentBooking.bookingType === 'client') && (
+                  <>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>رقم الفاتورة:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>{currentBooking.invoiceNumber || 'لا توجد فاتورة'}</p>
+                    </div>
+                    <div>
+                      <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>حالة التسوية:</span>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 800, margin: '4px 0 0 0' }}>
+                        {currentBooking.financialStatus === 'settled' ? 'تمت التسوية بالكامل' : 'معلّق / مستحق'}
+                      </p>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Modal Footer Actions */}
         <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px', display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
           
+          {userRole === 'admin' && (
+            <button
+              onClick={handleDeleteBookingClick}
+              className="btn btn-secondary"
+              style={{
+                marginRight: 'auto',
+                color: '#ef4444',
+                borderColor: 'rgba(239, 68, 68, 0.3)',
+                backgroundColor: 'rgba(239, 68, 68, 0.05)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                fontSize: '0.8rem'
+              }}
+            >
+              <Icons.Trash2 size={16} />
+              <span>حذف الحجز نهائياً</span>
+            </button>
+          )}
+
           {/* WhatsApp templates modal trigger button */}
           <button onClick={() => setIsMsgModalOpen(true)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', borderColor: '#10b981' }}>
             <Icons.MessageSquare size={16} />
@@ -479,7 +537,7 @@ export const BookingDetailModal = () => {
             <span>طباعة الحجز</span>
           </button>
 
-          {currentBooking.totalPrice !== null && currentBooking.remainingAmount > 0 && (
+          {isSuper && currentBooking.totalPrice !== null && currentBooking.remainingAmount > 0 && (
             <button
               onClick={() => {
                 if (setIsPaymentModalOpen) setIsPaymentModalOpen(true);
@@ -573,6 +631,32 @@ export const BookingDetailModal = () => {
             </div>
           </div>
         </div>
+      )}
+      {localDeleteOpen && (
+        <ConfirmDeleteModal
+          isOpen={true}
+          onClose={() => { setLocalDeleteOpen(false); setLocalDeleteError(''); }}
+          onConfirm={handleDeleteBookingConfirm}
+          title={currentBooking.status === 'مؤكد' ? 'إلغاء الحجز المؤكد' : 'حذف الحجز'}
+          description={currentBooking.status === 'مؤكد'
+            ? `الحجز بحالة “مؤكد”. سيتم تحويله إلى “ملغي” بدلاً من حذفه نهائياً للحفاظ على السجلات.`
+            : `هل أنت متأكد من حذف هذا الحجز بشكل نهائي؟`
+          }
+          itemDetails={[
+            { label: 'رقم الحجز', value: formatBookingNumber(currentBooking.bookingNumber) },
+            { label: 'اسم العميل', value: currentBooking.clientName || currentBooking.companyName || currentBooking.freelancerName || '-' },
+            { label: 'التاريخ', value: currentBooking.date || currentBooking.startDate || '-' },
+            { label: 'الحالة الحالية', value: currentBooking.status || '-' },
+          ]}
+          warnings={currentBooking.status === 'مؤكد'
+            ? ['تحويل إلى ملغي: لن يتم حذف بيانات الحجز من السجل ولكن ستتغيّر حالته إلى “ملغي”.']
+            : []
+          }
+          confirmLabel={currentBooking.status === 'مؤكد' ? 'تحويل إلى ملغي' : 'حذف الحجز'}
+          confirmVariant={currentBooking.status === 'مؤكد' ? 'warning' : 'danger'}
+          isLoading={localDeleteLoading}
+          errorMsg={localDeleteError}
+        />
       )}
     </div>
   );

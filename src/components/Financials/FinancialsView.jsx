@@ -18,12 +18,14 @@ export const FinancialsView = () => {
     addInvoice, 
     updateInvoice,
     cancelInvoice,
+    deleteInvoice,
     addPayment, 
     updatePayment,
     cancelPayment,
     addExpense,
     updateExpense,
     deleteExpense,
+    cancelExpense,
     addAuditLog,
     showCelebration,
     settings,
@@ -43,6 +45,8 @@ export const FinancialsView = () => {
   const [selectedReportForPDF, setSelectedReportForPDF] = useState(null); // Print modal for PDF Report
   const [editingInvoice, setEditingInvoice] = useState(null); // Edit invoice modal
   const [editingExpense, setEditingExpense] = useState(null); // Edit expense modal
+  const [selectedExpense, setSelectedExpense] = useState(null); // Expense details modal
+  const [specificYear, setSpecificYear] = useState(new Date().getFullYear());
 
   // ─── Delete/Cancel Financials State ──────────────────────────────────────────
   const [finDeleteModal, setFinDeleteModal] = useState({ open: false, type: '', id: null, item: null });
@@ -51,7 +55,7 @@ export const FinancialsView = () => {
 
   // Search & Global Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [dateRangeType, setDateRangeType] = useState('all'); // 'all' | 'today' | 'this_week' | 'this_month' | 'last_month' | 'this_year' | 'custom'
+  const [dateRangeType, setDateRangeType] = useState('all'); // 'all' | 'today' | 'this_week' | 'this_month' | 'last_month' | 'this_year' | 'specific_year' | 'custom'
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
   
@@ -100,6 +104,20 @@ export const FinancialsView = () => {
   // Check roles/permissions
   const isSuper = userRole === 'admin' || currentUser?.isSupervisor || currentUser?.role?.includes('مشرف') || currentUser?.role?.includes('مدير') || currentUser?.id === 1;
 
+  // Helper to check if an expense date is within 30 days
+  const isRecentExpense = (expenseDateStr) => {
+    if (!expenseDateStr) return false;
+    try {
+      const expDate = new Date(expenseDateStr);
+      const today = new Date();
+      const diffTime = Math.abs(today - expDate);
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      return diffDays <= 30;
+    } catch (e) {
+      return false;
+    }
+  };
+
   // Riyadh date helpers
   const getRiyadhDate = () => {
     return new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Riyadh' }));
@@ -138,6 +156,8 @@ export const FinancialsView = () => {
       }
       case 'this_year':
         return dateStr.startsWith(todayStr.substring(0, 4));
+      case 'specific_year':
+        return dateStr.startsWith(String(specificYear));
       case 'custom':
         if (customStartDate && customEndDate) return dateStr >= customStartDate && dateStr <= customEndDate;
         if (customStartDate) return dateStr >= customStartDate;
@@ -216,15 +236,15 @@ export const FinancialsView = () => {
   // Filtered Lists
   const filteredInvoices = useMemo(() => {
     return invoices.filter(inv => matchesFilters(inv, 'invoice'));
-  }, [invoices, searchQuery, dateRangeType, customStartDate, customEndDate, filterClient, filterCompany, filterService, filterStatus, filterSource, bookings]);
+  }, [invoices, searchQuery, dateRangeType, specificYear, customStartDate, customEndDate, filterClient, filterCompany, filterService, filterStatus, filterSource, bookings]);
 
   const filteredPayments = useMemo(() => {
     return payments.filter(p => matchesFilters(p, 'payment'));
-  }, [payments, searchQuery, dateRangeType, customStartDate, customEndDate, filterClient, filterCompany, filterMethod]);
+  }, [payments, searchQuery, dateRangeType, specificYear, customStartDate, customEndDate, filterClient, filterCompany, filterMethod]);
 
   const filteredExpenses = useMemo(() => {
     return expenses.filter(ex => matchesFilters(ex, 'expense'));
-  }, [expenses, searchQuery, dateRangeType, customStartDate, customEndDate, filterCompany, filterMethod]);
+  }, [expenses, searchQuery, dateRangeType, specificYear, customStartDate, customEndDate, filterCompany, filterMethod]);
 
   // Combined ledger (In & Out)
   const ledgerTransactions = useMemo(() => {
@@ -242,7 +262,8 @@ export const FinancialsView = () => {
         clientName: p.clientName,
         status: p.status || 'نشط',
         referenceNumber: p.referenceNumber,
-        notes: p.notes
+        notes: p.notes,
+        invoiceNumber: p.invoiceNumber
       };
     });
 
@@ -264,43 +285,43 @@ export const FinancialsView = () => {
     return [...ins, ...outs]
       .filter(item => matchesFilters(item, item.type === 'in' ? 'payment' : 'expense'))
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [payments, expenses, invoices, searchQuery, dateRangeType, customStartDate, customEndDate, filterClient, filterCompany, filterMethod]);
+  }, [payments, expenses, invoices, searchQuery, dateRangeType, specificYear, customStartDate, customEndDate, filterClient, filterCompany, filterMethod]);
 
   // Totals calculations
   const totalInvoiced = useMemo(() => {
-    return invoices
+    return filteredInvoices
       .filter(inv => inv.status !== 'ملغاة')
       .reduce((sum, inv) => sum + (Number(inv.total) || 0), 0);
-  }, [invoices]);
+  }, [filteredInvoices]);
 
   const totalPaid = useMemo(() => {
-    return payments
+    return filteredPayments
       .filter(p => p.status !== 'ملغي')
       .reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-  }, [payments]);
+  }, [filteredPayments]);
 
   const outstandingAmount = useMemo(() => totalInvoiced - totalPaid, [totalInvoiced, totalPaid]);
   
   const totalExpensesAmount = useMemo(() => {
-    return expenses
+    return filteredExpenses
       .filter(ex => ex.status !== 'ملغي')
       .reduce((sum, ex) => sum + (Number(ex.amount) || 0), 0);
-  }, [expenses]);
+  }, [filteredExpenses]);
 
   const netProfit = useMemo(() => totalPaid - totalExpensesAmount, [totalPaid, totalExpensesAmount]);
 
   const transactionsCount = useMemo(() => {
-    const activePayments = payments.filter(p => p.status !== 'ملغي').length;
-    const activeExpenses = expenses.filter(ex => ex.status !== 'ملغي').length;
+    const activePayments = filteredPayments.filter(p => p.status !== 'ملغي').length;
+    const activeExpenses = filteredExpenses.filter(ex => ex.status !== 'ملغي').length;
     return activePayments + activeExpenses;
-  }, [payments, expenses]);
+  }, [filteredPayments, filteredExpenses]);
 
   const linkedBookingsCount = useMemo(() => {
-    const bookingIds = invoices
+    const bookingIds = filteredInvoices
       .filter(inv => inv.status !== 'ملغاة' && inv.bookingId)
       .map(inv => inv.bookingId);
     return new Set(bookingIds).size;
-  }, [invoices]);
+  }, [filteredInvoices]);
 
   // Filtered audit logs
   const financialLogs = useMemo(() => {
@@ -498,12 +519,19 @@ export const FinancialsView = () => {
     setEditingInvoice(null);
   };
 
-  // Action cancel triggers
+  // Action cancel/delete triggers
   const triggerCancelInvoice = (invoiceId) => {
     const target = invoices.find(inv => inv.id === invoiceId);
     if (!target) return;
     setFinDeleteError('');
-    setFinDeleteModal({ open: true, type: 'invoice', id: invoiceId, item: target });
+    setFinDeleteModal({ open: true, type: 'invoice_cancel', id: invoiceId, item: target });
+  };
+
+  const triggerDeleteInvoice = (invoiceId) => {
+    const target = invoices.find(inv => inv.id === invoiceId);
+    if (!target) return;
+    setFinDeleteError('');
+    setFinDeleteModal({ open: true, type: 'invoice_delete', id: invoiceId, item: target });
   };
 
   const triggerCancelPayment = (paymentId) => {
@@ -517,7 +545,14 @@ export const FinancialsView = () => {
     const target = expenses.find(ex => ex.id === expenseId);
     if (!target) return;
     setFinDeleteError('');
-    setFinDeleteModal({ open: true, type: 'expense', id: expenseId, item: target });
+    setFinDeleteModal({ open: true, type: 'expense_cancel', id: expenseId, item: target });
+  };
+
+  const triggerDeleteExpense = (expenseId) => {
+    const target = expenses.find(ex => ex.id === expenseId);
+    if (!target) return;
+    setFinDeleteError('');
+    setFinDeleteModal({ open: true, type: 'expense_delete', id: expenseId, item: target });
   };
 
   // Confirm delete/cancel handler using new AppContext actions
@@ -527,10 +562,16 @@ export const FinancialsView = () => {
     setFinDeleteLoading(true);
     setFinDeleteError('');
     try {
-      if (type === 'invoice') {
+      if (type === 'invoice_cancel') {
         if (cancelInvoice) {
           await cancelInvoice(id);
           showCelebration('تم إلغاء الفاتورة! ⚠️');
+          if (selectedInvoice?.id === id) setSelectedInvoice(null);
+        }
+      } else if (type === 'invoice_delete') {
+        if (deleteInvoice) {
+          await deleteInvoice(id);
+          showCelebration('تم حذف الفاتورة نهائياً! 🗑️');
           if (selectedInvoice?.id === id) setSelectedInvoice(null);
         }
       } else if (type === 'payment') {
@@ -548,10 +589,15 @@ export const FinancialsView = () => {
           }
           showCelebration('تم إلغاء الدفعة المالية! ⚠️');
         }
-      } else if (type === 'expense') {
+      } else if (type === 'expense_cancel') {
+        if (cancelExpense) {
+          await cancelExpense(id);
+          showCelebration('تم إلغاء المصروف المالي! ❌');
+        }
+      } else if (type === 'expense_delete') {
         if (deleteExpense) {
           await deleteExpense(id);
-          showCelebration('تم حذف المصروف المالي بنجاح! 🗑️');
+          showCelebration('تم حذف المصروف نهائياً! 🗑️');
         }
       }
       setFinDeleteModal({ open: false, type: '', id: null, item: null });
@@ -605,6 +651,7 @@ export const FinancialsView = () => {
     else if (dateRangeType === 'this_month') periodTitle = `هذا الشهر (${today.substring(0, 7)})`;
     else if (dateRangeType === 'last_month') periodTitle = 'الشهر السابق';
     else if (dateRangeType === 'this_year') periodTitle = `هذا العام (${today.substring(0, 4)})`;
+    else if (dateRangeType === 'specific_year') periodTitle = `السنة المالية (${specificYear})`;
     else if (dateRangeType === 'custom') periodTitle = `الفترة من ${customStartDate || 'القبل'} إلى ${customEndDate || 'الآن'}`;
     else periodTitle = 'جميع الأوقات';
 
@@ -620,6 +667,35 @@ export const FinancialsView = () => {
 
     const avgValue = invs.length > 0 ? totalRev / invs.length : 0;
 
+    // 1. Revenues by Client/Company
+    const revByClient = {};
+    invs.forEach(inv => {
+      const client = inv.clientName || 'عملاء متفرقون';
+      revByClient[client] = (revByClient[client] || 0) + (inv.total || 0);
+    });
+
+    // 2. Revenues by Service Type
+    const revByService = {};
+    invs.forEach(inv => {
+      const b = bookings.find(book => String(book.id) === String(inv.bookingId));
+      const service = b?.title || inv.items?.[0]?.description || 'تغطية تصوير عامة';
+      revByService[service] = (revByService[service] || 0) + (inv.total || 0);
+    });
+
+    // 3. Revenues by Payment Method (received payments)
+    const revByMethod = {};
+    pays.forEach(p => {
+      const method = p.method || 'أخرى';
+      revByMethod[method] = (revByMethod[method] || 0) + (p.amount || 0);
+    });
+
+    // 4. Revenues by Month
+    const revByMonth = {};
+    invs.forEach(inv => {
+      const month = (inv.issueDate || '').substring(0, 7) || 'غير محدد';
+      revByMonth[month] = (revByMonth[month] || 0) + (inv.total || 0);
+    });
+
     return {
       periodTitle,
       totalRev,
@@ -631,7 +707,11 @@ export const FinancialsView = () => {
       avgValue,
       invoicesList: invs,
       expensesList: exps,
-      paymentsList: pays
+      paymentsList: pays,
+      revByClient,
+      revByService,
+      revByMethod,
+      revByMonth
     };
   };
 
@@ -806,12 +886,26 @@ export const FinancialsView = () => {
     );
   };
 
+  const handleLedgerRowClick = (t) => {
+    if (t.type === 'in') {
+      const invoice = invoices.find(inv => String(inv.invoiceNumber) === String(t.invoiceNumber));
+      if (invoice) {
+        setSelectedInvoice(invoice);
+      }
+    } else {
+      const expense = expenses.find(ex => ex.id === t.id);
+      if (expense) {
+        setSelectedExpense(expense);
+      }
+    }
+  };
+
   const renderLedgerTab = () => {
     const totalIn = ledgerTransactions
-      .filter(t => t.type === 'in' && t.status !== 'ملغي')
+      .filter(t => t.type === 'in' && t.status !== 'ملغي' && t.status !== 'ملغاة')
       .reduce((sum, t) => sum + t.amount, 0);
     const totalOut = ledgerTransactions
-      .filter(t => t.type === 'out' && t.status !== 'ملغي')
+      .filter(t => t.type === 'out' && t.status !== 'ملغي' && t.status !== 'ملغاة')
       .reduce((sum, t) => sum + t.amount, 0);
     const netCash = totalIn - totalOut;
 
@@ -858,7 +952,12 @@ export const FinancialsView = () => {
               {ledgerTransactions.map(t => {
                 const isCanceled = t.status === 'ملغي' || t.status === 'ملغاة';
                 return (
-                  <tr key={t.id} style={{ borderBottom: '1px solid var(--border-color)', opacity: isCanceled ? 0.5 : 1 }}>
+                  <tr 
+                    key={t.id} 
+                    style={{ borderBottom: '1px solid var(--border-color)', opacity: isCanceled ? 0.5 : 1, cursor: 'pointer' }}
+                    onClick={() => handleLedgerRowClick(t)}
+                    className="hover-row"
+                  >
                     <td style={{ padding: '12px', fontFamily: 'Inter' }}>{t.date}</td>
                     <td style={{ padding: '12px' }}>
                       <span className={`badge ${t.type === 'in' ? 'badge-success' : 'badge-danger'}`} style={{ padding: '4px 10px', fontSize: '0.72rem', borderRadius: '4px' }}>
@@ -879,15 +978,37 @@ export const FinancialsView = () => {
                     <td style={{ padding: '12px' }}>{t.clientName}</td>
                     <td style={{ padding: '12px', textAlign: 'center' }}>
                       {!isCanceled && isSuper ? (
-                        <button
-                          type="button"
-                          onClick={() => t.type === 'in' ? triggerCancelPayment(t.id) : triggerCancelExpense(t.id)}
-                          className="btn btn-secondary btn-sm"
-                          style={{ color: '#ef4444', padding: '4px 8px', fontSize: '0.72rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}
-                          title="إلغاء وتعديل الحركة"
-                        >
-                          إلغاء ❌
-                        </button>
+                        t.type === 'in' ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); triggerCancelPayment(t.id); }}
+                            className="btn btn-secondary btn-sm"
+                            style={{ color: '#ef4444', padding: '4px 8px', fontSize: '0.72rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                            title="إلغاء عملية الدفع واسترداد الرصيد"
+                          >
+                            إلغاء ❌
+                          </button>
+                        ) : isRecentExpense(t.date) ? (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); triggerDeleteExpense(t.id); }}
+                            className="btn btn-secondary btn-sm"
+                            style={{ color: '#ef4444', padding: '4px 8px', fontSize: '0.72rem', border: '1px solid rgba(239, 68, 68, 0.2)', backgroundColor: 'rgba(239,68,68,0.02)' }}
+                            title="حذف المصروف نهائياً"
+                          >
+                            🗑️ حذف
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); triggerCancelExpense(t.id); }}
+                            className="btn btn-secondary btn-sm"
+                            style={{ color: '#ef4444', padding: '4px 8px', fontSize: '0.72rem', border: '1px solid rgba(239, 68, 68, 0.2)' }}
+                            title="إلغاء المصروف محاسبياً"
+                          >
+                            إلغاء ❌
+                          </button>
+                        )
                       ) : !isCanceled ? (
                         <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>نشط</span>
                       ) : (
@@ -953,13 +1074,25 @@ export const FinancialsView = () => {
                       {isCanceled ? (
                         <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>ملغاة</span>
                       ) : isSuper ? (
-                        <button
-                          onClick={() => triggerCancelExpense(ex.id)}
-                          className="btn btn-secondary btn-sm"
-                          style={{ padding: '3px 8px', color: 'var(--status-danger)' }}
-                        >
-                          إلغاء ❌
-                        </button>
+                        isRecentExpense(ex.date) ? (
+                          <button
+                            onClick={() => triggerDeleteExpense(ex.id)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '3px 8px', color: '#ef4444', borderColor: 'rgba(239,68,68,0.2)', backgroundColor: 'rgba(239,68,68,0.02)' }}
+                            title="حذف المصروف نهائياً"
+                          >
+                            🗑️ حذف
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => triggerCancelExpense(ex.id)}
+                            className="btn btn-secondary btn-sm"
+                            style={{ padding: '3px 8px', color: 'var(--status-danger)' }}
+                            title="إلغاء المصروف محاسبياً"
+                          >
+                            إلغاء ❌
+                          </button>
+                        )
                       ) : (
                         <span style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>نشط</span>
                       )}
@@ -1062,6 +1195,105 @@ export const FinancialsView = () => {
                   {isFinanceHidden ? "••••••" : formatCurrency(r.avgValue)}
                 </strong>
               </div>
+            </div>
+          </div>
+
+          {/* Breakdown grids */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '20px', marginBottom: '24px' }}>
+            {/* Breakdown 1: Clients */}
+            <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+              <h5 style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>👥 الإيرادات حسب العميل / الشركة</h5>
+              <table style={{ width: '100%', fontSize: '0.78rem' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <th style={{ paddingBottom: '6px', textAlign: 'right' }}>العميل/الشركة</th>
+                    <th style={{ paddingBottom: '6px', textAlign: 'left' }}>الإيراد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(r.revByClient).map(([client, amount]) => (
+                    <tr key={client} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '6px 0', color: 'var(--text-main)' }}>{client}</td>
+                      <td style={{ padding: '6px 0', textAlign: 'left', fontWeight: 800 }}>{isFinanceHidden ? "••••••" : formatCurrency(amount)}</td>
+                    </tr>
+                  ))}
+                  {Object.keys(r.revByClient).length === 0 && (
+                    <tr><td colSpan="2" style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد بيانات</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Breakdown 2: Service Types */}
+            <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+              <h5 style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>🎥 الإيرادات حسب نوع الخدمة</h5>
+              <table style={{ width: '100%', fontSize: '0.78rem' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <th style={{ paddingBottom: '6px', textAlign: 'right' }}>الخدمة</th>
+                    <th style={{ paddingBottom: '6px', textAlign: 'left' }}>الإيراد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(r.revByService).map(([service, amount]) => (
+                    <tr key={service} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '6px 0', color: 'var(--text-main)' }}>{service}</td>
+                      <td style={{ padding: '6px 0', textAlign: 'left', fontWeight: 800 }}>{isFinanceHidden ? "••••••" : formatCurrency(amount)}</td>
+                    </tr>
+                  ))}
+                  {Object.keys(r.revByService).length === 0 && (
+                    <tr><td colSpan="2" style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد بيانات</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Breakdown 3: Payment Methods */}
+            <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+              <h5 style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>💳 المقبوضات حسب طريقة الدفع</h5>
+              <table style={{ width: '100%', fontSize: '0.78rem' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <th style={{ paddingBottom: '6px', textAlign: 'right' }}>طريقة الدفع</th>
+                    <th style={{ paddingBottom: '6px', textAlign: 'left' }}>المبلغ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(r.revByMethod).map(([method, amount]) => (
+                    <tr key={method} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '6px 0', color: 'var(--text-main)' }}>{method}</td>
+                      <td style={{ padding: '6px 0', textAlign: 'left', fontWeight: 800, color: '#10b981' }}>{isFinanceHidden ? "••••••" : formatCurrency(amount)}</td>
+                    </tr>
+                  ))}
+                  {Object.keys(r.revByMethod).length === 0 && (
+                    <tr><td colSpan="2" style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد بيانات</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Breakdown 4: Monthly Distribution */}
+            <div style={{ padding: '16px', borderRadius: '10px', backgroundColor: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
+              <h5 style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>📅 توزيع الإيرادات حسب الشهر</h5>
+              <table style={{ width: '100%', fontSize: '0.78rem' }}>
+                <thead>
+                  <tr style={{ color: 'var(--text-muted)' }}>
+                    <th style={{ paddingBottom: '6px', textAlign: 'right' }}>الشهر</th>
+                    <th style={{ paddingBottom: '6px', textAlign: 'left' }}>الإيراد</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(r.revByMonth).sort((a, b) => b[0].localeCompare(a[0])).map(([month, amount]) => (
+                    <tr key={month} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '6px 0', color: 'var(--text-main)' }}>{month}</td>
+                      <td style={{ padding: '6px 0', textAlign: 'left', fontWeight: 800 }}>{isFinanceHidden ? "••••••" : formatCurrency(amount)}</td>
+                    </tr>
+                  ))}
+                  {Object.keys(r.revByMonth).length === 0 && (
+                    <tr><td colSpan="2" style={{ padding: '10px', textAlign: 'center', color: 'var(--text-muted)' }}>لا توجد بيانات</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 
@@ -1265,8 +1497,9 @@ export const FinancialsView = () => {
     let itemDetails = [];
     let warnings = [];
     let confirmLabel = '';
+    let confirmVariant = 'warning';
     
-    if (type === 'invoice') {
+    if (type === 'invoice_cancel') {
       title = 'إلغاء الفاتورة';
       description = `أنت على وشك إلغاء الفاتورة رقم "${item.invoiceNumber}" محاسبياً. سيتم الاحتفاظ ببيانات الفاتورة وتغيير حالتها إلى "ملغاة" دون حذفها نهائياً من قاعدة البيانات.`;
       itemDetails = [
@@ -1275,8 +1508,20 @@ export const FinancialsView = () => {
         { label: 'تاريخ الإصدار', value: item.issueDate },
         { label: 'الإجمالي النهائي', value: formatCurrency(item.total) },
       ];
-      warnings = ['إلغاء الفاتورة سيجعلها غير قابلة للدفع أو التعديل، وستظهر كـ "ملغاة" في كشوف الحساب والتقارير.'];
+      warnings = ['إلغاء الفاتورة سيجعلها غير قابلة للدفع أو التعديل، وستظهر كـ "ملغاة" في كشوف الحساب والتقارير المالية.'];
       confirmLabel = 'إلغاء الفاتورة محاسبياً';
+      confirmVariant = 'warning';
+    } else if (type === 'invoice_delete') {
+      title = 'حذف الفاتورة نهائياً';
+      description = `أنت على وشك حذف الفاتورة رقم "${item.invoiceNumber}" نهائياً من قاعدة البيانات. لا يمكن التراجع عن هذه العملية.`;
+      itemDetails = [
+        { label: 'رقم الفاتورة', value: item.invoiceNumber },
+        { label: 'العميل', value: item.clientName },
+        { label: 'الإجمالي النهائي', value: formatCurrency(item.total) },
+      ];
+      warnings = ['سيتم حذف السجل المالي للفاتورة تماماً من قاعدة البيانات. تأكد من أن هذا الإجراء صحيح ولا يتعارض مع أي سجلات مالية.'];
+      confirmLabel = 'حذف الفاتورة نهائياً';
+      confirmVariant = 'danger';
     } else if (type === 'payment') {
       title = 'إلغاء عملية الدفع';
       description = `هل أنت متأكد من إلغاء هذه العملية المالية؟ سيتم إدراجها كعملية "ملغاة" محاسبياً وسيتم خصم المبلغ من الرصيد المدفوع للفاتورة المرتبطة بها.`;
@@ -1288,19 +1533,32 @@ export const FinancialsView = () => {
       ];
       warnings = ['سيتم إنقاص المبلغ المدفوع من الفاتورة المعنية وتحديث حالة الفاتورة تلقائياً.'];
       confirmLabel = 'تأكيد إلغاء الدفعة';
-    } else if (type === 'expense') {
+      confirmVariant = 'warning';
+    } else if (type === 'expense_cancel') {
       title = 'إلغاء المصروف المالي';
-      description = `أنت على وشك إلغاء مصروف مالي. سيتم تحديث حالة المصروف إلى "ملغي" دون حذفه نهائياً من السجل المالي لأغراض المراجعة والمطابقة المالية.`;
+      description = `أنت على وشك إلغاء مصروف مالي. سيتم تحديث حالة المصروف إلى "ملغاة" دون حذفه نهائياً من السجل المالي لأغراض المراجعة والمطابقة المالية.`;
       itemDetails = [
         { label: 'بيان المصروف', value: item.title },
         { label: 'التصنيف', value: item.category },
         { label: 'المبلغ', value: formatCurrency(item.amount) },
         { label: 'المستلم', value: item.recipient || '-' },
       ];
-      warnings = ['سيتم استبعاد هذا المصروف من مجاميع الأرباح والخسائر والتقارير المالية النشطة.'];
+      warnings = ['سيتم استبعاد هذا المصروف من مجاميع الأرباح والخسائر والتقارير المالية النشطة مع الاحتفاظ بسجل الحركة ملغىً.'];
       confirmLabel = 'تأكيد إلغاء المصروف';
+      confirmVariant = 'warning';
+    } else if (type === 'expense_delete') {
+      title = 'حذف المصروف نهائياً';
+      description = `هل أنت متأكد من حذف هذا المصروف بشكل نهائي؟ لا يمكن التراجع عن هذه العملية.`;
+      itemDetails = [
+        { label: 'بيان المصروف', value: item.title },
+        { label: 'التصنيف', value: item.category },
+        { label: 'المبلغ', value: formatCurrency(item.amount) },
+      ];
+      warnings = ['سيتم إزالة المصروف تماماً من قاعدة البيانات.'];
+      confirmLabel = 'حذف المصروف نهائياً';
+      confirmVariant = 'danger';
     }
-
+ 
     return (
       <ConfirmDeleteModal
         isOpen={true}
@@ -1311,7 +1569,7 @@ export const FinancialsView = () => {
         itemDetails={itemDetails}
         warnings={warnings}
         confirmLabel={confirmLabel}
-        confirmVariant="warning"
+        confirmVariant={confirmVariant}
         isLoading={finDeleteLoading}
         errorMsg={finDeleteError}
       />
@@ -1320,6 +1578,45 @@ export const FinancialsView = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <style>{`
+        @media print {
+          .sidebar,
+          .topbar,
+          .content-area > *:not(.modal-overlay),
+          .no-print-bar,
+          .no-print {
+            display: none !important;
+          }
+          .modal-overlay {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            height: auto !important;
+            background: white !important;
+            display: block !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            z-index: 99999 !important;
+          }
+          .modal-content {
+            box-shadow: none !important;
+            border: none !important;
+            max-width: 100% !important;
+            width: 100% !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: white !important;
+            color: black !important;
+          }
+          .print-invoice-container {
+            padding: 0 !important;
+            margin: 0 !important;
+            width: 100% !important;
+            background: white !important;
+          }
+        }
+      `}</style>
       
       {/* 1. Dynamic Actions Sub-header bar */}
       <div className="card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px', background: 'rgba(255, 255, 255, 0.03)', backdropFilter: 'blur(10px)', border: '1px solid var(--border-color)' }}>
@@ -1449,6 +1746,7 @@ export const FinancialsView = () => {
                 <option value="this_month">هذا الشهر</option>
                 <option value="last_month">الشهر السابق</option>
                 <option value="this_year">هذا العام</option>
+                <option value="specific_year">سنة محددة</option>
                 <option value="custom">فترة مخصصة</option>
               </select>
             </div>
@@ -1483,6 +1781,24 @@ export const FinancialsView = () => {
           {/* Expandable Advanced Filters for Reports & Admin */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px' }}>
             
+            {/* Specific Year Picker */}
+            {dateRangeType === 'specific_year' && (
+              <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label className="form-label" style={{ fontSize: '0.74rem' }}>السنة المحددة</label>
+                <select
+                  className="form-control"
+                  value={specificYear}
+                  onChange={e => setSpecificYear(Number(e.target.value))}
+                >
+                  <option value="2024">2024</option>
+                  <option value="2025">2025</option>
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                </select>
+              </div>
+            )}
+
             {/* Custom dates picker */}
             {dateRangeType === 'custom' && (
               <>
@@ -1770,6 +2086,22 @@ export const FinancialsView = () => {
                       >
                         ❌ إلغاء الفاتورة
                       </button>
+                      {(selectedInvoice.status === 'مسودة' || selectedInvoice.status === 'غير مدفوعة') && (selectedInvoice.paid || 0) === 0 && (
+                        <button 
+                          type="button" 
+                          onClick={() => triggerDeleteInvoice(selectedInvoice.id)} 
+                          className="btn btn-secondary"
+                          style={{
+                            color: '#ef4444',
+                            borderColor: 'rgba(239,68,68,0.3)',
+                            backgroundColor: 'rgba(239,68,68,0.05)',
+                            fontSize: '0.8rem'
+                          }}
+                          title="🗑️ حذف الفاتورة نهائياً"
+                        >
+                          🗑️ حذف الفاتورة
+                        </button>
+                      )}
                     </>
                   )}
                 </div>
@@ -2224,11 +2556,47 @@ export const FinancialsView = () => {
                   <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label className="form-label">مستند / فاتورة مرفقة (اختياري)</label>
                     <input 
-                      type="text" 
+                      type="file" 
                       className="form-control" 
-                      placeholder="اسم المستند المرفق (مثال: doc_0023)"
-                      value={expenseForm.attachment} 
-                      onChange={e => setExpenseForm({ ...expenseForm, attachment: e.target.value })} 
+                      accept="image/*,application/pdf"
+                      onChange={e => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            if (file.type.startsWith('image/')) {
+                              const img = new Image();
+                              img.src = event.target.result;
+                              img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                const max_size = 600;
+                                let width = img.width;
+                                let height = img.height;
+                                if (width > height) {
+                                  if (width > max_size) {
+                                    height *= max_size / width;
+                                    width = max_size;
+                                  }
+                                } else {
+                                  if (height > max_size) {
+                                    width *= max_size / height;
+                                    height = max_size;
+                                  }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                ctx.drawImage(img, 0, 0, width, height);
+                                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+                                setExpenseForm({ ...expenseForm, attachment: compressedDataUrl });
+                              };
+                            } else {
+                              setExpenseForm({ ...expenseForm, attachment: event.target.result });
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }} 
                     />
                   </div>
                 </div>
@@ -2483,10 +2851,151 @@ export const FinancialsView = () => {
                 </tbody>
               </table>
 
+              {/* Breakdowns in Print Report */}
+              <h4 style={{ fontSize: '0.86rem', fontWeight: 900, borderBottom: '2px solid #e2e8f0', paddingBottom: '6px', color: '#1e293b', marginTop: '24px' }}>📊 الإحصائيات والتوزيعات المالية للمبيعات</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px', marginTop: '10px', marginBottom: '24px' }}>
+                <div style={{ border: '1px solid #e2e8f0', padding: '10px', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>الإيرادات حسب العميل / الشركة</span>
+                  <table style={{ width: '100%', fontSize: '0.68rem' }}>
+                    <tbody>
+                      {Object.entries(selectedReportForPDF.revByClient).map(([client, amount]) => (
+                        <tr key={client} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td>{client}</td>
+                          <td style={{ textAlign: 'left', fontWeight: 'bold' }}>{formatCurrency(amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', padding: '10px', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>الإيرادات حسب نوع الخدمة</span>
+                  <table style={{ width: '100%', fontSize: '0.68rem' }}>
+                    <tbody>
+                      {Object.entries(selectedReportForPDF.revByService).map(([service, amount]) => (
+                        <tr key={service} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td>{service}</td>
+                          <td style={{ textAlign: 'left', fontWeight: 'bold' }}>{formatCurrency(amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', padding: '10px', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>المقبوضات حسب طريقة الدفع</span>
+                  <table style={{ width: '100%', fontSize: '0.68rem' }}>
+                    <tbody>
+                      {Object.entries(selectedReportForPDF.revByMethod).map(([method, amount]) => (
+                        <tr key={method} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td>{method}</td>
+                          <td style={{ textAlign: 'left', fontWeight: 'bold', color: '#10b981' }}>{formatCurrency(amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div style={{ border: '1px solid #e2e8f0', padding: '10px', borderRadius: '8px' }}>
+                  <span style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 'bold', display: 'block', marginBottom: '6px' }}>توزيع الإيرادات حسب الشهر</span>
+                  <table style={{ width: '100%', fontSize: '0.68rem' }}>
+                    <tbody>
+                      {Object.entries(selectedReportForPDF.revByMonth).sort((a,b) => b[0].localeCompare(a[0])).map(([month, amount]) => (
+                        <tr key={month} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td>{month}</td>
+                          <td style={{ textAlign: 'left', fontWeight: 'bold' }}>{formatCurrency(amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
               <div style={{ marginTop: '30px', borderTop: '2px solid #e2e8f0', paddingTop: '14px', display: 'flex', justifyContent: 'space-between', fontSize: '0.8rem', color: '#64748b' }}>
                 <span>نهاية التقرير المالي المعتمد</span>
                 <span className="en-digits">الصفحة 1 من 1</span>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selected Expense Modal */}
+      {selectedExpense && (
+        <div className="modal-overlay" onClick={() => setSelectedExpense(null)}>
+          <div className="modal-content" onClick={e => e.stopPropagation()} style={{ maxWidth: '600px', direction: 'rtl' }}>
+            <div className="modal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px', borderBottom: '1px solid var(--border-color)' }}>
+              <h3 className="modal-title" style={{ margin: 0, fontSize: '1.05rem', fontWeight: 900 }}>💸 تفاصيل المصروف #{selectedExpense.id}</h3>
+              <button className="btn btn-icon btn-secondary" style={{ width: '30px', height: '30px', padding: 0 }} onClick={() => setSelectedExpense(null)}><Icons.X size={18} /></button>
+            </div>
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>بيان المصروف</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{selectedExpense.title}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>التصنيف</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{selectedExpense.category}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>المبلغ</span>
+                  <strong style={{ color: '#ef4444', fontSize: '1.1rem', fontFamily: 'Inter' }}>{isFinanceHidden ? "••••••" : formatCurrency(selectedExpense.amount)}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>التاريخ</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem', fontFamily: 'Inter' }}>{selectedExpense.date}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>المسؤول</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{selectedExpense.spentBy}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>المستلم</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{selectedExpense.recipient || '-'}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>طريقة الدفع</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem' }}>{selectedExpense.paymentMethod || 'تحويل بنكي'}</strong>
+                </div>
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>رقم المرجع</span>
+                  <strong style={{ color: 'var(--text-main)', fontSize: '0.9rem', fontFamily: 'Inter' }}>{selectedExpense.referenceNumber || '-'}</strong>
+                </div>
+              </div>
+
+              {selectedExpense.notes && (
+                <div>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block' }}>ملاحظات</span>
+                  <p style={{ margin: '4px 0 0 0', fontSize: '0.8rem', color: 'var(--text-main)', backgroundColor: 'var(--bg-main)', padding: '10px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>{selectedExpense.notes}</p>
+                </div>
+              )}
+
+              {/* File Attachment Viewer */}
+              {selectedExpense.attachment && (
+                <div style={{ marginTop: '10px' }}>
+                  <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>المستند المرفق (الفاتورة)</span>
+                  {selectedExpense.attachment.startsWith('data:image/') ? (
+                    <div style={{ border: '1px solid var(--border-color)', borderRadius: '8px', overflow: 'hidden', backgroundColor: 'var(--bg-main)', textAlign: 'center', padding: '10px' }}>
+                      <img 
+                        src={selectedExpense.attachment} 
+                        alt="مرفق الفاتورة" 
+                        style={{ maxWidth: '100%', maxHeight: '250px', objectFit: 'contain', borderRadius: '4px' }} 
+                      />
+                    </div>
+                  ) : (
+                    <a 
+                      href={selectedExpense.attachment} 
+                      download={`expense_attachment_${selectedExpense.id}`}
+                      className="btn btn-secondary" 
+                      style={{ fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                    >
+                      <Icons.Download size={14} />
+                      <span>تحميل المرفق 📥</span>
+                    </a>
+                  )}
+                </div>
+              )}
+            </div>
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--border-color)', paddingTop: '14px', display: 'flex', justifyContent: 'flex-end', gap: '10px', padding: '16px' }}>
+              <button className="btn btn-secondary" onClick={() => setSelectedExpense(null)}>إغلاق</button>
             </div>
           </div>
         </div>

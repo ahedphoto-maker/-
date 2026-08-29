@@ -25,3 +25,23 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# Secrets and credentials
+.env
+star-media-service-account.json
+
+# Developer helper and scratch scripts
+inspect_users_temp.cjs
+inspect_dirty.cjs
+backup_prod.cjs
+wipe_prod.cjs
+verify_prod.cjs
+checkDb.js
+check_firestore_admin.js
+check_firestore_admin.py
+delete_operational_data.cjs
+wipe_all_operational_data.cjs
+get_all_collections.cjs
+simple_delete.cjs
+tryEmailAuth.js
+

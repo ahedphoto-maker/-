@@ -20,8 +20,18 @@ export const ClientsView = () => {
     setSelectedBooking,
     setIsBookingDetailOpen,
     setIsBookingFormOpen,
-    userRole
+    userRole,
+    deleteBooking,
+    cancelInvoice,
+    currentUser
   } = useApp();
+
+  const isSuper = userRole === 'admin' || 
+                  (currentUser && (
+                    currentUser.isSupervisor === true || 
+                    currentUser.id === 1 || 
+                    (currentUser.role && (currentUser.role.includes('مدير') || currentUser.role.includes('مشرف')))
+                  ));
 
   const isAdmin = userRole === 'admin';
 
@@ -79,10 +89,12 @@ export const ClientsView = () => {
   const [deleteModal, setDeleteModal] = useState({ open: false, client: null });
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [deleteOption, setDeleteOption] = useState('only_client');
 
   const handleDeleteClientClick = (e, client) => {
     e.stopPropagation(); // prevent opening profile
     setDeleteError('');
+    setDeleteOption('only_client');
     setDeleteModal({ open: true, client });
   };
 
@@ -91,6 +103,35 @@ export const ClientsView = () => {
     setDeleteLoading(true);
     setDeleteError('');
     try {
+      if (deleteOption === 'cascade') {
+        const clientName = deleteModal.client.name;
+        const clientId = deleteModal.client.id;
+        const clientEmail = deleteModal.client.email;
+
+        const relatedBookings = bookings?.filter(b =>
+          b.clientId === clientId ||
+          (b.bookingType === 'client' && b.clientName === clientName)
+        ) || [];
+        const relatedInvoices = invoices?.filter(inv =>
+          inv.clientName === clientName ||
+          inv.clientEmail === clientEmail
+        ) || [];
+
+        // Delete all related bookings
+        for (const booking of relatedBookings) {
+          if (deleteBooking) {
+            await Promise.resolve(deleteBooking(booking.id));
+          }
+        }
+
+        // Cancel all related invoices
+        for (const invoice of relatedInvoices) {
+          if (cancelInvoice) {
+            await Promise.resolve(cancelInvoice(invoice.id));
+          }
+        }
+      }
+
       await deleteClient(deleteModal.client.id);
       setDeleteModal({ open: false, client: null });
       // If currently viewing the deleted client's profile, go back to list
@@ -580,36 +621,40 @@ export const ClientsView = () => {
             >
               📅 سجل الحجوزات ({bookingsCount})
             </button>
-            <button
-              onClick={() => setCrmTab('invoices')}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '8px',
-                backgroundColor: crmTab === 'invoices' ? 'var(--primary-color)' : 'transparent',
-                color: crmTab === 'invoices' ? '#ffffff' : 'var(--text-muted)',
-                fontWeight: 800,
-                fontSize: '0.76rem',
-                cursor: 'pointer'
-              }}
-            >
-              🧾 الفواتير الصادرة ({clientInvoices.length})
-            </button>
-            <button
-              onClick={() => setCrmTab('payments')}
-              style={{
-                padding: '8px 16px',
-                border: 'none',
-                borderRadius: '8px',
-                backgroundColor: crmTab === 'payments' ? 'var(--primary-color)' : 'transparent',
-                color: crmTab === 'payments' ? '#ffffff' : 'var(--text-muted)',
-                fontWeight: 800,
-                fontSize: '0.76rem',
-                cursor: 'pointer'
-              }}
-            >
-              💰 المدفوعات والمالية
-            </button>
+            {isSuper && (
+              <>
+                <button
+                  onClick={() => setCrmTab('invoices')}
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    backgroundColor: crmTab === 'invoices' ? 'var(--primary-color)' : 'transparent',
+                    color: crmTab === 'invoices' ? '#ffffff' : 'var(--text-muted)',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  🧾 الفواتير الصادرة ({clientInvoices.length})
+                </button>
+                <button
+                  onClick={() => setCrmTab('payments')}
+                  style={{
+                    padding: '8px 16px',
+                    border: 'none',
+                    borderRadius: '8px',
+                    backgroundColor: crmTab === 'payments' ? 'var(--primary-color)' : 'transparent',
+                    color: crmTab === 'payments' ? '#ffffff' : 'var(--text-muted)',
+                    fontWeight: 800,
+                    fontSize: '0.76rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  💰 المدفوعات والمالية
+                </button>
+              </>
+            )}
             <button
               onClick={() => setCrmTab('comms')}
               style={{
@@ -648,14 +693,18 @@ export const ClientsView = () => {
                 <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>المهام المكتملة</span>
                 <h4 style={{ margin: '4px 0 0 0', fontSize: '1.1rem', fontWeight: 950, color: '#8b5cf6' }}>{completedCount}</h4>
               </div>
-              <div className="card" style={{ padding: '12px', borderRight: '3px solid #10b981', borderRadius: '10px' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>إجمالي الفواتير</span>
-                <h4 style={{ margin: '4px 0 0 0', fontSize: '0.96rem', fontWeight: 950, color: '#10b981' }}>{formatCurrency(totalInvoiced)}</h4>
-              </div>
-              <div className="card" style={{ padding: '12px', borderRight: '3px solid #ef4444', borderRadius: '10px' }}>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>الرصيد المستحق</span>
-                <h4 style={{ margin: '4px 0 0 0', fontSize: '0.96rem', fontWeight: 950, color: '#ef4444' }}>{formatCurrency(remainingBalance)}</h4>
-              </div>
+              {isSuper && (
+                <>
+                  <div className="card" style={{ padding: '12px', borderRight: '3px solid #10b981', borderRadius: '10px' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>إجمالي الفواتير</span>
+                    <h4 style={{ margin: '4px 0 0 0', fontSize: '0.96rem', fontWeight: 950, color: '#10b981' }}>{formatCurrency(totalInvoiced)}</h4>
+                  </div>
+                  <div className="card" style={{ padding: '12px', borderRight: '3px solid #ef4444', borderRadius: '10px' }}>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>الرصيد المستحق</span>
+                    <h4 style={{ margin: '4px 0 0 0', fontSize: '0.96rem', fontWeight: 950, color: '#ef4444' }}>{formatCurrency(remainingBalance)}</h4>
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Notes & Files Grid */}
@@ -801,7 +850,7 @@ export const ClientsView = () => {
         )}
 
         {/* TAB 3: Invoices */}
-        {crmTab === 'invoices' && (
+        {isSuper && crmTab === 'invoices' && (
           <div className="card" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
             <h4 style={{ margin: '0 0 4px 0', fontSize: '0.88rem', fontWeight: 900 }}>🧾 كشف فواتير العميل الصادرة</h4>
             
@@ -843,7 +892,7 @@ export const ClientsView = () => {
         )}
 
         {/* TAB 4: Payments */}
-        {crmTab === 'payments' && (
+        {isSuper && crmTab === 'payments' && (
           <div className="card" style={{ padding: '16px', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
             <h4 style={{ margin: 0, fontSize: '0.88rem', fontWeight: 900 }}>💰 سجل الدفعات المالية والتحصيل</h4>
             
@@ -1349,7 +1398,7 @@ export const ClientsView = () => {
                   <div>✉️ البريد: <strong>{c.email || '-'}</strong></div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', borderTop: '1px dashed var(--border-color)', paddingTop: '4px' }}>
                     <span>📅 الحجوزات: <strong style={{ color: 'var(--text-main)' }}>{bookingsCount}</strong></span>
-                    <span>💰 المسدد: <strong style={{ color: '#10b981' }}>{formatCurrency(totalSpent)}</strong></span>
+                    {isSuper && <span>💰 المسدد: <strong style={{ color: '#10b981' }}>{formatCurrency(totalSpent)}</strong></span>}
                   </div>
                 </div>
 
@@ -1374,12 +1423,13 @@ export const ClientsView = () => {
           inv.clientName === deleteModal.client.name ||
           inv.clientEmail === deleteModal.client.email
         ) || [];
+        const hasRelatedData = relatedBookings.length > 0 || relatedInvoices.length > 0;
         const warnings = [];
         if (relatedBookings.length > 0) {
-          warnings.push(`هذا العميل لديه ${relatedBookings.length} حجز/حجوزات مرتبطة به. سيتم حذف بيانات العميل فقط، وستظل الحجوزات موجودة في النظام.`);
+          warnings.push(`هذا العميل لديه ${relatedBookings.length} حجز/حجوزات مرتبطة به.`);
         }
         if (relatedInvoices.length > 0) {
-          warnings.push(`يوجد ${relatedInvoices.length} فاتورة/فواتير مرتبطة بهذا العميل. ستظل الفواتير محفوظة في السجل المالي.`);
+          warnings.push(`يوجد ${relatedInvoices.length} فاتورة/فواتير مرتبطة بهذا العميل.`);
         }
         return (
           <ConfirmDeleteModal
@@ -1387,7 +1437,7 @@ export const ClientsView = () => {
             onClose={() => { setDeleteModal({ open: false, client: null }); setDeleteError(''); }}
             onConfirm={handleDeleteClientConfirm}
             title="حذف العميل"
-            description={`هل أنت متأكد من حذف العميل "${deleteModal.client.name}" بشكل نهائي؟ لا يمكن التراجع عن هذه العملية.`}
+            description={`هل أنت متأكد من حذف العميل "${deleteModal.client.name}"؟ لا يمكن التراجع عن هذه العملية.`}
             itemDetails={[
               { label: 'اسم العميل', value: deleteModal.client.name },
               { label: 'رقم الجوال', value: deleteModal.client.phone || '-' },
@@ -1395,11 +1445,52 @@ export const ClientsView = () => {
               { label: 'عدد الحجوزات المرتبطة', value: relatedBookings.length },
             ]}
             warnings={warnings}
-            confirmLabel="حذف العميل نهائياً"
+            confirmLabel={deleteOption === 'cascade' ? "حذف العميل والبيانات المرتبطة" : "حذف العميل فقط"}
             confirmVariant="danger"
             isLoading={deleteLoading}
             errorMsg={deleteError}
-          />
+          >
+            {hasRelatedData && (
+              <div style={{
+                marginTop: '10px',
+                padding: '12px',
+                borderRadius: '10px',
+                border: '1px solid var(--border-color)',
+                backgroundColor: 'var(--bg-main)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px'
+              }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                  ⚠️ العميل لديه بيانات مرتبطة بالنظام. اختر الإجراء المناسب للحذف:
+                </span>
+                
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.78rem' }}>
+                  <input
+                    type="radio"
+                    name="deleteOption"
+                    value="only_client"
+                    checked={deleteOption === 'only_client'}
+                    onChange={() => setDeleteOption('only_client')}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>حذف العميل فقط (ستظل الحجوزات والفواتير في النظام) 👤</span>
+                </label>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '0.78rem', color: '#ef4444', fontWeight: 700 }}>
+                  <input
+                    type="radio"
+                    name="deleteOption"
+                    value="cascade"
+                    checked={deleteOption === 'cascade'}
+                    onChange={() => setDeleteOption('cascade')}
+                    style={{ cursor: 'pointer' }}
+                  />
+                  <span>حذف العميل وحذف كافة الحجوزات والفواتير المرتبطة به 🗑️</span>
+                </label>
+              </div>
+            )}
+          </ConfirmDeleteModal>
         );
       })()}
 
